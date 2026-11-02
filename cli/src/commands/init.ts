@@ -28,7 +28,14 @@ import {
 } from "../project.js";
 import { checkSubdomain, registerSubdomain, suggestSubdomain, wranglerBearer } from "../subdomain.js";
 import { ask, askHidden } from "../ui.js";
-import { type Account, makeWrangler, type WhoAmI } from "../wrangler.js";
+import {
+  type Account,
+  classifyDeployFailure,
+  deployFailureError,
+  lastErrorLine,
+  makeWrangler,
+  type WhoAmI,
+} from "../wrangler.js";
 import { deployProject, startPrewarm } from "./deploy.js";
 
 export interface InitOptions {
@@ -66,18 +73,22 @@ export type InitStep =
   | { kind: "pick-account"; accounts: Account[] }
   | { kind: "use-account"; accountId: string; accountName?: string }
   | { kind: "subdomain" }
+  | { kind: "plan-check" }
   | { kind: "scaffold"; mode: ProviderHostMode }
   | { kind: "control-token"; action: "generate" | "reuse" }
   | { kind: "amp-token"; source: "env" | "file" | "prompt" | "keep" }
   | { kind: "deploy"; secrets: string[] }
   | { kind: "health" }
   | { kind: "status" }
+  | { kind: "selftest" }
   | { kind: "start-provider" }
   | { kind: "wait-provider"; timeoutMs: number }
   | { kind: "print-external-env" }
   | { kind: "done"; command: string };
 
 export const PROVIDER_WAIT_MS = 90_000;
+/** How long init waits for the prewarm instances (a first start on a cold host pulls the image). */
+export const SELFTEST_WAIT_MS = 180_000;
 /** Provider must stay up this long with no reject, no second-provider line and no restart. */
 export const PROVIDER_STABLE_MS = 15_000;
 const CRON_PERIOD_MS = 5 * 60_000;
@@ -187,13 +198,19 @@ export function plan(o: InitOptions, p: InitProbes): InitStep[] {
   }
   if (fails.length > 0) return fails;
 
-  const steps: InitStep[] = [account as InitStep, { kind: "scaffold", mode: o.mode }];
+  const steps: InitStep[] = [account as InitStep, { kind: "plan-check" }, { kind: "scaffold", mode: o.mode }];
   steps.push({ kind: "control-token", action: p.hasControlToken ? "reuse" : "generate" });
   if (ampSource) steps.push({ kind: "amp-token", source: ampSource });
   const secrets = ["CONTROL_TOKEN"];
   // "prompt" may still end as keep (Enter on a re-run); the executor drops the secret then.
   if (ampSource && ampSource !== "keep") secrets.push("AMP_ORB_PROVIDER_TOKEN");
-  steps.push({ kind: "subdomain" }, { kind: "deploy", secrets }, { kind: "health" }, { kind: "status" });
+  steps.push(
+    { kind: "subdomain" },
+    { kind: "deploy", secrets },
+    { kind: "health" },
+    { kind: "status" },
+    { kind: "selftest" },
+  );
   if (o.mode === "cloudflare") {
     steps.push({ kind: "start-provider" }, { kind: "wait-provider", timeoutMs: PROVIDER_WAIT_MS });
   } else steps.push({ kind: "print-external-env" });
@@ -251,6 +268,8 @@ export async function runInit(
   let lastStatus: unknown;
   let command: string | undefined;
   let providerStartedByCron = false;
+  let prewarmStarted = -1;
+  let prewarmAt = 0;
   let accountName: string | undefined;
   let providerName = o.providerName;
 
@@ -399,11 +418,73 @@ export async function runInit(
         ui.step("health: /v1/health ok");
         break;
       }
+      case "plan-check": {
+        // Before the image build: a Free account fails here in seconds, not after a 1.8 GB push.
+        // Best effort: only a clear plan or login error stops init; any other error is a warning.
+        const r = await makeWrangler(ctx.run, { accountId }).run(["containers", "list", "--json"], {
+          timeoutMs: 60_000,
+        });
+        if (r.code === 0) {
+          ui.step("plan: Containers are available on this account");
+          break;
+        }
+        const out = `${r.stdout}\n${r.stderr}`;
+        const kind = classifyDeployFailure(out);
+        if (kind === "paid" || kind === "auth") throw deployFailureError(kind, out);
+        ui.warn(`plan check skipped (wrangler containers list failed: ${lastErrorLine(out)})`);
+        break;
+      }
       case "status":
         lastStatus = expectOk(await (api as ApiClient).get("/v1/status"), "status check");
         ui.step("health: /v1/status ok (control token accepted)");
-        if (config) await startPrewarm(ctx, api as ApiClient, config);
+        if (config) prewarmStarted = (await startPrewarm(ctx, api as ApiClient, config)).started;
+        prewarmAt = ctx.now();
         break;
+      case "selftest": {
+        // The prewarm run starts throwaway orbs from the new image. If one becomes ready, the image,
+        // the registry and the container runtime work. No Amp thread and no debug route needed.
+        if (prewarmStarted === 0) {
+          ui.step('self-test: skipped (no prewarm instance was started; set "prewarm" above 0 to enable)');
+          break;
+        }
+        const until = ctx.now() + SELFTEST_WAIT_MS;
+        let view: Record<string, unknown> = {};
+        for (;;) {
+          const r = await (api as ApiClient).get("/v1/warm");
+          const body = (r.body && typeof r.body === "object" ? r.body : {}) as Record<string, unknown>;
+          const last = (body.last && typeof body.last === "object" ? body.last : {}) as Record<
+            string,
+            unknown
+          >;
+          // Ignore the result of an earlier run.
+          if (typeof last.at === "string" && Date.parse(last.at) >= prewarmAt - 10_000) {
+            view = last;
+            if (Number(last.pending) === 0) break;
+          }
+          if (ctx.now() >= until) break;
+          await ctx.sleep(3_000);
+        }
+        const count = Number(view.count) || 0;
+        const ok = Number(view.ok) || 0;
+        const ms = Array.isArray(view.msPerInstance) ? (view.msPerInstance as number[]) : [];
+        if (count > 0 && Number(view.pending) === 0 && ok === 0) {
+          const jobs = Array.isArray(view.jobs) ? (view.jobs as Record<string, unknown>[]) : [];
+          const why = jobs.find((j) => typeof j.error === "string")?.error;
+          throw new CliError(
+            `orb self-test failed: no instance started from the new image${why ? ` (${String(why)})` : ""}`,
+            "run cf-orbs logs --provider and cf-orbs status, check the image build, then run cf-orbs deploy",
+          );
+        }
+        if (count > 0 && Number(view.pending) === 0) {
+          const t = ms.length > 0 ? ` in ${ms.map((m) => `${(m / 1000).toFixed(0)} s`).join(" and ")}` : "";
+          if (ok < count) ui.warn(`self-test: only ${ok} of ${count} instances started${t}`);
+          else ui.step(`self-test: orb image starts (${ok} of ${count} ready${t})`);
+        } else
+          ui.warn(
+            "self-test: still running after 3 min; the first start on a new host pulls the image. Check cf-orbs status",
+          );
+        break;
+      }
       case "start-provider": {
         const r = await (api as ApiClient).post("/v1/provider/start");
         if (r.status === 404 || r.status === 405) {

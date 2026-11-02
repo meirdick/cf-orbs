@@ -26,6 +26,7 @@ describe("init plan: cloudflare mode", () => {
     const s = plan(opts(), probes());
     expect(kinds(s)).toEqual([
       "use-account",
+      "plan-check",
       "scaffold",
       "control-token",
       "amp-token",
@@ -33,6 +34,7 @@ describe("init plan: cloudflare mode", () => {
       "deploy",
       "health",
       "status",
+      "selftest",
       "start-provider",
       "wait-provider",
       "done",
@@ -131,12 +133,14 @@ describe("init plan: external mode", () => {
     const s = plan(opts({ mode: "external", nonInteractive: true }), probes({ tty: false }));
     expect(kinds(s)).toEqual([
       "use-account",
+      "plan-check",
       "scaffold",
       "control-token",
       "subdomain",
       "deploy",
       "health",
       "status",
+      "selftest",
       "print-external-env",
       "done",
     ]);

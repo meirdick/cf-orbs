@@ -384,6 +384,10 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
       subdomain?: "has" | "none";
       secretList?: string[];
       warm?: "ok" | "fail";
+      /** wrangler containers list: ok (default), paid (plan error), other (unknown error) */
+      containers?: "ok" | "paid" | "other";
+      /** GET /v1/warm after init starts prewarm: ok (default), failed (no instance ready), pending (never done) */
+      selftest?: "ok" | "failed" | "pending";
       /** /v1/provider/restart body; {status, error} answers with that HTTP error */
       restart?: Record<string, unknown>;
       /** provider fields merged into /v1/status, given the call count */
@@ -402,6 +406,16 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
           stdout: JSON.stringify({ loggedIn: true, accounts: [{ id: "acct1", name: "Me" }] }),
           stderr: "",
         };
+      if (args.includes("containers") && args.includes("list")) {
+        if (extra.containers === "paid")
+          return {
+            code: 1,
+            stdout: "",
+            stderr: "A request to the Cloudflare API failed: Containers need the Workers Paid plan",
+          };
+        if (extra.containers === "other") return { code: 1, stdout: "", stderr: "network unreachable" };
+        return { code: 0, stdout: "[]", stderr: "" };
+      }
       if (args.includes("deploy")) {
         const f = args[args.indexOf("--secrets-file") + 1] as string;
         secretPaths.push(f);
@@ -469,6 +483,26 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
           );
         return Response.json({ runId: "1", count: 2, started: 2, orbIds: ["warm-1-1", "warm-2-1"] });
       }
+      if (u.pathname === "/v1/warm" && (init?.method ?? "GET") === "GET") {
+        const at = new Date(1_000_000 + t).toISOString();
+        const st = extra.selftest ?? "ok";
+        const last =
+          st === "pending"
+            ? { runId: "1", count: 2, at, ok: 0, failed: 0, pending: 2, msPerInstance: [] }
+            : st === "failed"
+              ? {
+                  runId: "1",
+                  count: 2,
+                  at,
+                  ok: 0,
+                  failed: 2,
+                  pending: 0,
+                  msPerInstance: [],
+                  jobs: [{ state: "failed", error: "image pull failed" }],
+                }
+              : { runId: "1", count: 2, at, ok: 2, failed: 0, pending: 0, msPerInstance: [41000, 39000] };
+        return Response.json({ prewarm: 2, last });
+      }
       if (u.pathname === "/v1/status") {
         statusCalls++;
         return Response.json({
@@ -514,6 +548,64 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     return { ctx, cap, deploySecrets, secretPaths, calls, secretDeletes, cfApi };
   }
 
+  it("plan check: a Containers plan error stops init before scaffold and deploy", async () => {
+    const { ctx, deploySecrets, calls } = setup(
+      ["--non-interactive"],
+      { AMP_ORB_PROVIDER_TOKEN: "aop_live_testtoken123" },
+      2,
+      true,
+      { containers: "paid" },
+    );
+    const o = initOptions(ctx);
+    const probes = { ...(await gatherProbes(ctx)), tty: false };
+    await expect(runInit(ctx, o, plan(o, probes))).rejects.toThrow(/Workers Paid/);
+    expect(deploySecrets).toHaveLength(0);
+    expect(calls).toEqual([]);
+  });
+
+  it("plan check: an unknown wrangler error is a warning and init goes on", async () => {
+    const { ctx, cap } = setup(
+      ["--non-interactive"],
+      { AMP_ORB_PROVIDER_TOKEN: "aop_live_testtoken123" },
+      2,
+      true,
+      { containers: "other" },
+    );
+    const o = initOptions(ctx);
+    const probes = { ...(await gatherProbes(ctx)), tty: false };
+    await runInit(ctx, o, plan(o, probes));
+    expect(cap.lines.join("\n")).toMatch(/plan check skipped .*network unreachable/);
+  });
+
+  it("self-test: fails init when no prewarm instance becomes ready", async () => {
+    const { ctx } = setup(
+      ["--non-interactive"],
+      { AMP_ORB_PROVIDER_TOKEN: "aop_live_testtoken123" },
+      2,
+      true,
+      { selftest: "failed" },
+    );
+    const o = initOptions(ctx);
+    const probes = { ...(await gatherProbes(ctx)), tty: false };
+    await expect(runInit(ctx, o, plan(o, probes))).rejects.toThrow(
+      /orb self-test failed: no instance started from the new image \(image pull failed\)/,
+    );
+  });
+
+  it("self-test: still pending after the wait is a warning, not a failure", async () => {
+    const { ctx, cap } = setup(
+      ["--non-interactive"],
+      { AMP_ORB_PROVIDER_TOKEN: "aop_live_testtoken123" },
+      2,
+      true,
+      { selftest: "pending" },
+    );
+    const o = initOptions(ctx);
+    const probes = { ...(await gatherProbes(ctx)), tty: false };
+    await runInit(ctx, o, plan(o, probes));
+    expect(cap.lines.join("\n")).toMatch(/self-test: still running after 3 min/);
+  });
+
   it("cloudflare mode: deploys with both secrets, deletes the secrets file, waits for the provider, prints the amp command", async () => {
     const token = "aop_live_testtoken123";
     const { ctx, cap, deploySecrets, secretPaths, calls } = setup(["--non-interactive"], {
@@ -532,14 +624,17 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(deploySecrets[0]?.CONTROL_TOKEN).toMatch(/^[0-9a-f]{64}$/);
     expect(existsSync(secretPaths[0] as string)).toBe(false);
     // running is only the container state: init waits until it has stayed up 15 s with a clean log
-    expect(calls.slice(0, 5)).toEqual([
+    expect(calls.slice(0, 6)).toEqual([
       "GET /v1/health",
       "GET /v1/status",
       "POST /v1/warm",
+      "GET /v1/warm",
       "POST /v1/provider/start",
       "GET /v1/status",
     ]);
-    expect(calls.slice(5).every((c) => c === "GET /v1/status")).toBe(true);
+    expect(calls.slice(6).every((c) => c === "GET /v1/status")).toBe(true);
+    expect(cap.lines).toContain("plan: Containers are available on this account");
+    expect(cap.lines).toContain("self-test: orb image starts (2 of 2 ready in 41 s and 39 s)");
     expect(cap.lines).toContain("prewarm: started 2 instances in the background; check cf-orbs status");
     expect(calls.length).toBeGreaterThanOrEqual(6);
     const state = await readState(ctx.paths);
@@ -661,7 +756,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(o.mode).toBe("external");
     const r = await runInit(ctx, o, plan(o, { ...(await gatherProbes(ctx)), tty: false }));
     expect(Object.keys(deploySecrets[0] ?? {})).toEqual(["CONTROL_TOKEN"]);
-    expect(calls).toEqual(["GET /v1/health", "GET /v1/status", "POST /v1/warm"]);
+    expect(calls).toEqual(["GET /v1/health", "GET /v1/status", "POST /v1/warm", "GET /v1/warm"]);
     const out = cap.lines.join("\n");
     expect(out).toContain("CF_ORBS_URL=https://cf-orbs.sub.workers.dev");
     expect(out).toContain(`CF_ORBS_CONTROL_TOKEN_FILE=${ctx.paths.controlToken}`);

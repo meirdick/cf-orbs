@@ -23,7 +23,7 @@ npx wrangler whoami     # must show "You are logged in" and the account
 - Node too old: ask the user to install Node 22+.
 - Docker fails: ask the user to start Docker.
 - Not logged in: `npx wrangler login` opens a browser. Ask the user to finish it, then run `npx wrangler whoami` again.
-- The account must be on Workers Paid. You cannot check this from the CLI; the deploy fails with `Containers need the Workers Paid plan` if it is not.
+- The account must be on Workers Paid. `init` asks wrangler to list Containers before the image build and stops with `Containers need the Workers Paid plan` on a clear plan error. The check is best effort: the deploy fails with the same message if it misses.
 
 ## 2. Install
 

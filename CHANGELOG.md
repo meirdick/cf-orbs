@@ -4,6 +4,11 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- `init` plan check: before it scaffolds or builds the image, `init` runs `wrangler containers list`. A clear plan or login error stops init in seconds, not after the 1.8 GB push. Any other error is a warning.
+- `init` self-test: after the deploy, `init` waits for the prewarm instances (throwaway orbs from the new image). It prints `self-test: orb image starts (N of N ready in X s)`, fails with a one-line fix if none becomes ready, and warns if they are still starting after 3 min. It is skipped when `prewarm` is 0.
+
 ## [0.1.1] - 2026-11-02
 
 ### Fixed

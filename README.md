@@ -244,7 +244,7 @@ v0.1. The control plane, dispatch program, provider host and CLI are built and u
 
 Known gaps:
 
-- `init` has no orb self-test yet, and no Workers Paid check before the first deploy (a Free account finds out from the deploy error).
+- The plan check before the first deploy is best effort: it asks wrangler to list Containers and stops only on a clear plan or login error. Any other error is a warning, and a Free account may still find out from the deploy error.
 - Paused orbs restore after an image rebuild. A restored disk keeps its old content; new image content reaches only orbs started from the image.
 - Orb lost mid-turn: Amp spawns the orb again and the agent runs the failed tool call again. The disk is kept; running processes and shell state are lost.
 - Not tested yet: the provider's memory on `lite` over 24 h, restore after the source image is deleted from the registry, the Desktop pane, and Docker inside an orb. Snapshot storage has no published price (beta).

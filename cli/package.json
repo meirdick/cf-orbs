@@ -1,6 +1,6 @@
 {
   "name": "cf-orbs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run Amp orbs on Cloudflare Containers: self-hosted orb provider, one command to install.",
   "license": "Apache-2.0",
   "type": "module",

@@ -1,0 +1,8 @@
+.wrangler/
+node_modules/
+dist/
+.dev.vars
+*.local
+.secrets.json
+*.secrets.*
+.claude/

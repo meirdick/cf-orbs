@@ -1,0 +1,71 @@
+# Checks on every push and pull request to main. Needs no secrets and no Docker.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (Node ${{ matrix.node }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # wrangler 4 needs Node 22 or later. cli/package.json engines says the same.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The Docker tests skip unless CF_ORBS_DOCKER=1 (see docker-tests.yml).
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build CLI
+        run: npm run build -w cli
+
+      - name: License files in the CLI package match the root
+        run: cmp LICENSE cli/LICENSE && cmp NOTICE cli/NOTICE
+
+      # Runs prepack (sync-templates --strict and the build), so a missing template source fails here, not at release.
+      - name: Package dry run
+        run: npm pack --dry-run -w cli
+
+      # --containers-rollout=none skips the image builds, so the dry run needs no Docker and no login.
+      # docker-tests.yml runs the full dry run that builds both images.
+      - name: Worker dry run
+        run: npx wrangler deploy --dry-run --containers-rollout=none --config worker/wrangler.jsonc --outdir "$RUNNER_TEMP/worker-dist"
+
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      # shellcheck comes with the ubuntu-24.04 runner image. npm run shellcheck uses the same flags as a
+      # local run: dispatch.sh is POSIX sh, entry.sh is bash.
+      - name: Shellcheck
+        run: |
+          shellcheck --version
+          npm run shellcheck

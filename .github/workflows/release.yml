@@ -1,0 +1,101 @@
+# Publishes the cf-orbs CLI to npm and makes a GitHub release when a v* tag is pushed.
+#
+# Publishing uses npm trusted publishing (OIDC). There is no npm token to store or rotate.
+#
+# Setup (once):
+#   1. Make the GitHub repo public. --provenance fails on a private repo.
+#   2. Publish the first version by hand (npm publish -w cli --access public), or claim the name with a placeholder.
+#   3. npmjs.com → cf-orbs → Settings → Trusted Publisher → GitHub Actions:
+#      owner meirdick, repository cf-orbs, workflow release.yml.
+#
+# Release:
+#   1. Set "version" in cli/package.json. In CHANGELOG.md, move the "Unreleased" items under
+#      "## [X.Y.Z] - YYYY-MM-DD" and add the compare link at the bottom.
+#   2. Commit to main, then: git tag vX.Y.Z && git push origin vX.Y.Z
+# The tag must equal the cli/package.json version, the tagged commit must be on main, and CHANGELOG.md
+# must have a dated section for the version.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # npm trusted publishing and provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the "on main" check needs the history of main
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Check tag, version and changelog
+        id: meta
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./cli/package.json').version")"
+          if [ "$version" != "$pkg" ]; then
+            echo "Failed: tag $GITHUB_REF_NAME does not match cli/package.json version $pkg — fix: set the version and tag again"
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Failed: tag $GITHUB_REF_NAME points to a commit that is not on main — fix: merge to main and tag that commit"
+            exit 1
+          fi
+          heading="$(grep -E "^## \\[$(printf '%s' "$version" | sed 's/[.]/\\./g')\\]" CHANGELOG.md || true)"
+          if ! printf '%s\n' "$heading" | grep -Eq '^## \[[^]]+\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+            echo "Failed: CHANGELOG.md has no dated section for $version (found: \"${heading:-none}\") — fix: use \"## [$version] - YYYY-MM-DD\" and tag again"
+            exit 1
+          fi
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[^]]*\]: / { next }
+            on { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "Failed: CHANGELOG.md has no section for $version — fix: add \"## [$version] - <date>\" and tag again"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # A version with a hyphen (0.2.0-rc.1) goes to the npm "next" tag and a GitHub pre-release.
+          case "$version" in
+            *-*) echo "npm_tag=next" >> "$GITHUB_OUTPUT"; echo "gh_flags=--prerelease" >> "$GITHUB_OUTPUT" ;;
+            *) echo "npm_tag=latest" >> "$GITHUB_OUTPUT"; echo "gh_flags=" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # Trusted publishing needs npm 11.5.1 or later. Node 22 comes with npm 10.
+      - name: Update npm
+        run: npm install -g npm@11
+
+      - name: Install
+        run: npm ci
+
+      - name: Check
+        run: |
+          npm run typecheck
+          npm run lint
+          npx vitest run
+          cmp LICENSE cli/LICENSE
+          cmp NOTICE cli/NOTICE
+          npm run shellcheck
+          npx wrangler deploy --dry-run --containers-rollout=none --config worker/wrangler.jsonc --outdir "$RUNNER_TEMP/worker-dist"
+
+      # prepack syncs cli/templates and builds cli/dist. npm gets a short-lived token through OIDC.
+      - name: Publish to npm
+        run: npm publish -w cli --provenance --access public --tag "${{ steps.meta.outputs.npm_tag }}"
+
+      - name: GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --title "cf-orbs ${{ steps.meta.outputs.version }}" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag ${{ steps.meta.outputs.gh_flags }}
+        env:
+          GH_TOKEN: ${{ github.token }}

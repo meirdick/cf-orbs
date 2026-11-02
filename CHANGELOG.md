@@ -1,0 +1,86 @@
+# Changelog
+
+All notable changes to cf-orbs are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can break config or the control-plane API.
+
+## [Unreleased]
+
+## [0.1.0] - 2026-11-02
+
+### Added
+
+- `cf-orbs snapshots prune [--older-than 7d] [--all] [--yes]`: lists snapshot data that no orb and no live project mapping uses, unused for 7 days (`--all`: any age). `--yes` deletes each one with `wrangler containers images delete <repo>:rootfs-snapshot-<sha256 of id>` (an undocumented path; a failure on one id is reported and skipped) and drops it from the Registry index. `cf-orbs status` shows `prunable: N (X GB)`. New routes `GET /v1/snapshots?candidates=1` and `POST /v1/snapshots/forget-many`.
+- Config `prewarm` (default 2, 0-5; 0 = off). After `cf-orbs deploy`, `upgrade` or `init`, the Worker starts N throwaway instances from the new image, waits until they answer, and destroys them (cap 3 min each). The first spawn on a host without the image takes 37-52 s (1.8 GB pull); this raises the odds of a host that has it. No guarantee: Cloudflare picks the host. Cost: about 1 min of the orb size per instance. Amp never sees these instances. `cf-orbs status` shows the last run (`prewarm: 2 of 2 ready in 41 s and 39 s, 3m ago`); `GET /v1/warm` gives it as JSON.
+- Warm pause, config `warmMinutes` (default 10, 0-120; 0 = old behaviour). On an Amp pause, cf-orbs saves the disk but keeps the container and Amp's processes running for `warmMinutes`. A message in that time needs no restore and no restart: Amp uses the still-connected executor and sends no spawn. Measured: message → first tool result 3.88 and 3.94 s (was 9.6 s p50), tool use → result 0.36 and 0.32 s (was 5.1 s). A warm orb bills like an awake one (default size ≈ $0.11/h, ≤ $0.02 per pause), holds a `maxRunning` slot, and counts toward `maxAwakeHours`. A pause with `ORB_SNAPSHOT_ID` stays cold (quiesced disk). `cf-orbs status` shows `warm (Nm left)`.
+- Config `hugePages` (default `true`): each spawn sets transparent huge pages to `always` in the orb. The guest kernel ships with `never`, so new memory was slow to allocate (docs/benchmarks.md "Disk: fsync cost"). The bootstrap prints `thp: always`. Work bench (N = 5): 512 MB write with fsync 1.33 → 0.91 s p50; CPU, git clone and npm install not worse. `false` keeps the kernel default.
+- Config `fastTmpfsGb` (default 0 = off, max 8 and memory GiB − 3): each spawn mounts a memory-backed tmpfs with `huge=always` at `/mnt/fast`, for caches and temp data. 512 MB writes in 0.06-0.21 s there against 1.3 s on the root disk. Not in snapshots.
+- Config `projectSnapshotRefresh` (`"off"` default, or `"on-change"`). After a spawn from a project snapshot, cf-orbs checks whether amp updated itself (bootstrap line `amp: updated <old> -> <new>`) or the image digest changed since the project pause. If so, it marks the mapping stale and forgets it, at most once per project per 24 h. It never starts threads or orbs and changes nothing on Amp's side. Amp does not always save a new snapshot after that, so `cf-orbs status` shows the stale flag and says to delete the cached snapshot in Amp settings. A project pause now records the amp version and the image digest in the mapping, and `cf-orbs status` shows them per project snapshot.
+- `cf-orbs init --vcpu <1-4>` sets the orb size to N vCPU, N × 3 GiB, 20 GB disk. `--vcpu 2` gives the cheaper custom 2/6/20 ($0.059/h fixed for memory and disk).
+
+### Security
+
+- Pause masks token shapes (`aop_live_`, `orb_`, `Bearer`, JWT) in `~/.cf-orbs/bootstrap.log` and `~/.cache/amp/logs/*.log` before it snapshots the disk, for cold and warm pauses (R19). Masks keep the length of the match, so log offsets stay valid.
+
+### Changed
+
+- Wake path: shorter polls. Measured live after the provider restart fix (one restore wake, N = 1): provider claim → job completed 4082 ms (was 4535 ms), spawn op 2.1 s (was 2.0 s), op end → job completed 820 ms (was 1792 ms). Expected 0.6-0.8 s less; got 0.45 s less claim → completed, because claim → op start was 1.1 s this time. `dispatch.sh` polls again at once after a reply with new lines (it slept up to 1 s). The op's last line and result wake the long-poll once, and a notify during the read no longer waits 1 s. Spawn skips the second connected check when the bootstrap saw the connect. Bootstrap polls 10 ms (child pid) and 20 ms (Amp's pid file), was 50 and 100 ms; Docker: script to launch 66 → 33 ms, connect detection 51 → 13 ms (means, N = 30). The readiness probe retries after 0.1, 0.2, 0.4, 0.8 s, then every 1 s (was every 1 s). The `timing:` line shows each prelude step.
+- Restore wake: spawn op 1.5-1.7 s (was 2.4 s in the wake trace). Spawn reads the amp binary in parallel with the bootstrap script (launch → connected median 783 → 384 ms, N = 4 and 6), and the CPU step uses one `sudo` for all CPUs. The bootstrap prints a `timing:` line.
+- Default orb size is custom 4 vCPU / 12 GiB / 20 GB ($0.113/h fixed for memory and disk). Was 2/6/20. CPU is billed on active use only.
+
+### Fixed
+
+- `cf-orbs deploy` did not restart the provider container for a new provider image, so fixes in `dispatch.sh` or `entry.sh` did not go live (only a token change restarted it). Now `deploy` writes a hash of the provider image inputs to the Worker (`CF_ORBS_PROVIDER_BUILD`). ProviderHost stores the build and image it started with. `deploy` and `upgrade` call the new `POST /v1/provider/restart?ifImageChanged=1`, and the 5-min cron does the same check. `deploy` prints `provider: restarted for the new image` or `provider: image unchanged`. The Worker log gets `provider: image changed <old8> -> <new8>; restarted`. `cf-orbs status` shows the provider start time and image digest. A provider DO on an older build stops its container and is reset so the new code starts the new image. A provider DO on code from before this fix is stopped, and `deploy` starts it again once it unloads. Verified live: two deploys restarted the provider for a new image. In both, the provider DO ran the new code at once (R17 did not apply), so the reset and old-code paths are covered by unit tests only. Amp accepted the new provider 33-37 s after the restart, when it saw the old connection go; jobs wait in that time.
+- Amp reported the host CPU count (8) for an orb, not its vCPUs (R7). The bootstrap now takes offline each CPU outside the affinity mask, on every spawn. Verified live: Amp metrics went from 8 to 2 cores on a 2 vCPU orb. After deploy, the bootstrap log shows `cpus: 2 allowed of 8 online; offlined 6`, and `nproc` gives 2. The Enterprise fee now follows the instance size.
+
+### Docs
+
+- R6 tested: after an orb is lost mid-turn, Amp spawns it again and the agent runs the failed tool call again. Disk kept; running processes lost.
+- A cold spawn downloads the current amp binary (162 MB, about 5 s) when the copy in the image is older.
+- Benchmarks: harness commit caveat. The next round reruns both sides from one clean commit.
+- R18 resolved: a paused orb restored after `cf-orbs deploy` pushed a new image digest. Snapshots are not bound to the digest, so upgrade with paused orbs is safe. The 0.1.0 known gap "Upgrade with paused orbs" no longer applies. A restored disk keeps its old content; new image content reaches only orbs started from the image.
+- Wake trace (N = 1) in docs/benchmarks.md: of a 9.1 s wake to first tool, cf-orbs takes about 2.6 s. Most of the rest is Amp starting its headless executor after bootstrap connects.
+- Benchmark baselines: the Docker reference provider has no CPU or memory limit; E2B reference 4 vCPU / 8 GB; Vercel reference 4 vCPU (R23). The next round adds E2B and Vercel Sandbox, N = 10 each.
+
+## Before 0.1.0 (pre-release builds)
+
+First public release.
+
+### Added
+
+- Control plane on Cloudflare Workers. One `OrbSession` Durable Object and container per orb, a `Registry` Durable Object for the run-slot cap and project snapshot maps, and a `ProviderHost` Durable Object.
+- Amp orb operations `spawn`, `pause` and `delete` as async ops (`POST /v1/orbs/:id/ops`, long-poll `GET /v1/ops/:opId`). A replayed job attaches to the op already running.
+- Pause takes a disk snapshot and stops the container. Spawn restores the per-orb snapshot (about 1 s to ready in M0 and M1 tests), else the project snapshot from `ORB_SNAPSHOT_ID`, else boots the image.
+- Project snapshots: a new thread on a known repo starts from the disk Amp already set up.
+- Bootstrap guard: `setsid` launch with a boot-id-checked pid file, readiness from Amp's headless pid file, `umask 022`, short hostname. A retried spawn with the same token starts no second process.
+- Watchdog alarm: pauses an orb awake longer than `maxAwakeHours`. Optional checkpoint snapshots every `checkpointMinutes`.
+- `dispatch.sh`: POSIX `sh` + `curl` dispatch program. Step lines, one final `Failed: <cause> — fix: <action>` line, no secrets in argv or output.
+- Provider host in two modes: `cloudflare` (a `lite` container in the Worker, restarted by an alarm and a 5-min cron) and `external` (your own host, systemd unit in [provider/README.md](provider/README.md)).
+- Public `/v1` API behind the `CONTROL_TOKEN` bearer. Every public route is 404 when the secret is not set.
+- Redaction of tokens in every stored or printed log line, with the same rules in the Worker and in the shell scripts.
+- CLI `cf-orbs` with `init`, `deploy`, `status`, `logs`, `doctor`, `snapshots`, `upgrade` and `uninstall`. Every command takes `--json` and `--dir`. `init` is re-runnable and has a `--non-interactive` mode for CI.
+- Pinned orb image (Amp image digest plus pinned `tini`) and `cf-orbs upgrade --digest` that keeps the old image key while snapshots still use it.
+- Debug exec and benchmark routes behind `"debugExec": true`, off by default.
+- Benchmark harness: substrate, E2E and wake benchmarks against Amp-hosted orbs, and a renderer that writes [docs/benchmarks.md](docs/benchmarks.md) from the raw JSON in `bench/results/`.
+- CI (typecheck, lint, unit tests, CLI build, Worker dry run, shellcheck), a weekly Docker test workflow and an npm release workflow with provenance.
+
+### Fixed (found in M1 end-to-end tests)
+
+- Bootstrap no longer passes `umask 077` to Amp. Amp wrote `/etc/gitconfig` as 0600 and setup failed with "Repository configuration failed".
+- Spawn readiness uses Amp's `~/.cache/amp/pids/headless-bootstrap.pid`. The "Connected" line in `cli.log` can be flushed minutes late.
+- Bootstrap sets `hostname localhost`, because `/etc/hosts` is read-only after a snapshot restore.
+- The generic redaction rule no longer removes snapshot ids.
+
+### Known gaps
+
+- `init` does not run the orb self-test yet (start an orb, `amp --version`, DNS and TLS to Amp, snapshot and restore) and does not pre-warm the image.
+- No Workers Paid check before the first deploy. A Free account learns it from the deploy error.
+- Upgrade with paused orbs: their snapshots may not restore on a new image (R18). Push or commit work first.
+- Not yet checked whether Amp writes `ORB_TOKEN` into files that a snapshot keeps (R19). The token expires after 15 min.
+- A Durable Object that holds a running container keeps the old Worker code after a deploy until it is evicted.
+- Amp caches one project snapshot per provider for 72 h. After a change to the image or `.agents/setup`, delete it in Amp → Orb Settings → Snapshots.
+- Amp reports the host CPU count (8) for an orb, not its vCPUs (R7). This matters if Amp bills by reported size.
+- One orb size per install. Egress is open; no allowlist mode.
+- Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
+- Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
+
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.1.0

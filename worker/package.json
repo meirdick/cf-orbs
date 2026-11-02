@@ -1,0 +1,14 @@
+{
+  "name": "@cf-orbs/worker",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
+}

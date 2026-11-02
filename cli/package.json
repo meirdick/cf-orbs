@@ -1,0 +1,42 @@
+{
+  "name": "cf-orbs",
+  "version": "0.1.0",
+  "description": "Run Amp orbs on Cloudflare Containers: self-hosted orb provider, one command to install.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "cf-orbs": "bin/cf-orbs.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meirdick/cf-orbs.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/meirdick/cf-orbs#readme",
+  "bugs": {
+    "url": "https://github.com/meirdick/cf-orbs/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "sync-templates": "node scripts/sync-templates.mjs",
+    "build": "node scripts/sync-templates.mjs && tsc -p tsconfig.build.json",
+    "prepack": "node scripts/sync-templates.mjs --strict && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "wrangler": "4.156.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6"
+  }
+}

@@ -1,0 +1,60 @@
+# Runs the orb scripts in the pinned Amp orb image, then builds both container images with a wrangler
+# dry run. Manual or weekly: the image is ~1.8 GB to pull and ~6 GB on disk. Needs no secrets.
+name: Docker tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      # Keep in step with the FROM line in image/Dockerfile and BASE_IMAGE in worker/test/scripts.docker.test.ts.
+      AMP_ORB_IMAGE: us-central1-docker.pkg.dev/amp-prod-0/amp-orb/amp-orb@sha256:378c5e2188f00960eca36dc806aa04e1cacd92c2341665bcdf4692326c462d6d
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Free disk space for the orb image
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - name: Check that the image pin matches image/Dockerfile
+        run: grep -qF "FROM $AMP_ORB_IMAGE" image/Dockerfile
+
+      - name: Install
+        run: npm ci
+
+      - name: Pull the pinned Amp orb image
+        run: docker pull "$AMP_ORB_IMAGE"
+
+      # Scripts run in the base image as uid 1000, PID 1 = sleep infinity.
+      - name: Docker tests (base image)
+        env:
+          CF_ORBS_DOCKER: "1"
+        run: npx vitest run worker/test/scripts.docker.test.ts
+
+      # Same tests in the image cf-orbs deploys (tini as PID 1).
+      - name: Build image/Dockerfile
+        run: docker build -t cf-orbs-orb:ci image
+
+      - name: Docker tests (built image)
+        env:
+          CF_ORBS_DOCKER: "1"
+          CF_ORBS_DOCKER_IMAGE: cf-orbs-orb:ci
+        run: npx vitest run worker/test/scripts.docker.test.ts
+
+      # Without --containers-rollout=none, wrangler builds the orb and provider images even in a dry run.
+      - name: Worker dry run with image builds
+        run: npx wrangler deploy --dry-run --config worker/wrangler.jsonc --outdir "$RUNNER_TEMP/worker-dist"

@@ -1,0 +1,69 @@
+name: Bug report
+description: Something in cf-orbs does not work as the docs say.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. For a security problem, do not use this form: see [SECURITY.md](https://github.com/meirdick/cf-orbs/blob/main/SECURITY.md).
+
+        **Before you paste any output, check it for tokens.** cf-orbs redacts `aop_live_…`, `orb_…`, bearer values and JWTs, but check anyway. Never paste `.cf-orbs/control-token`, `AMP_ORB_PROVIDER_TOKEN` or `ORB_TOKEN`.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got. Include the `Failed:` line if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. npx cf-orbs init --provider cloudflare
+        2. amp -ox "hello" --orb-provider cf-orbs
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: cf-orbs doctor output
+      description: Run `cf-orbs doctor` in your project directory. It never starts anything.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: cf-orbs logs output
+      description: |
+        For a failed thread, `cf-orbs logs <orb>`. The orb id is `amp-<thread id>`; `cf-orbs status` lists the orbs.
+        For a provider problem, `cf-orbs logs --provider`.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: cf-orbs version
+      description: "`cf-orbs --version`"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Provider mode
+      options:
+        - cloudflare (default)
+        - external
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, `node --version`, `docker --version`, `npx wrangler --version`
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Config changes from the defaults (`cf-orbs.config.jsonc`), Amp thread links, screenshots.

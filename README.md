@@ -6,17 +6,18 @@ Community project. Not affiliated with Cloudflare or Amp (Sourcegraph). "Cloudfl
 
 ## Why cf-orbs
 
-Measured against Amp-hosted orbs and Amp's reference providers for Docker, E2B and Vercel, same prompt, same project, same night (2026-10-31, [full table](https://cf-orbs-site.mdick85.workers.dev/#compare), [method](docs/benchmarks.md)):
+Amp's self-hosted orbs work like this: you provide the compute, and Amp turns it into orbs. cf-orbs makes your Cloudflare account that compute. You keep the same Amp threads and the same orb experience, on machines you own.
 
-- **Fast new threads.** Project snapshots skip `.agents/setup`: about 12 s of orb setup before the first turn, against 36-45 s for the E2B and Vercel reference scripts, which rebuild the repo every thread.
-- **Fast wake.** Warm pause keeps the orb and its Amp executor alive for 10 min after Amp pauses it (snapshot taken first, `warmMinutes` to change). A follow-up in that window runs its first tool in 0.3-0.5 s; Amp-hosted takes 0.85 s, a cold restore 1.5-2 s plus process start.
-- **Fast network.** git clone 0.26 s, npm install of express 7.7 s; Amp-hosted a1.small 0.54 s and 15.2 s; E2B 0.44 s and 10.1 s.
-- **Same interactive speed.** Tool round trips on a live orb are 0.8-0.9 s on every provider.
-- **Reliable.** 10 of 10 threads in every benchmark round. A lost orb comes back in 22 s and the agent retries. Paused orbs restore after an image rebuild.
-- **Cheapest cloud option at this size.** About $0.11/h running idle and $0.17/h at 20% CPU for 4 vCPU / 12 GiB / 20 GB; no compute charge while paused (snapshot storage has no published rate yet). Amp-hosted a1.small is $0.17/h for 2 CPU / 4 GiB; E2B about $0.33/h for 4 vCPU / 8 GiB.
-- **Yours.** One CLI, no cluster, no extra API keys. Orbs, snapshots and logs stay in your Cloudflare account.
+- **Your account.** Orbs, snapshots and logs stay in your Cloudflare account. The provider connects out to Amp. Nothing connects in.
+- **No server to run.** One CLI, no cluster, no extra API keys. Cloudflare runs the machines.
+- **Your image.** Orbs start from your own image and toolchain (`image/Dockerfile`).
+- **Your bill.** You pay Cloudflare. A paused orb has no compute charge.
+- **New threads start ready.** Repo setup runs once. Each new thread then starts from that project snapshot, with your dependencies already installed.
+- **Recovers by itself.** A lost orb comes back and the agent runs the failed tool call again. Paused orbs restore after an image rebuild.
 
-Known limits, measured: writes of new data on the root disk are slower (512 MB with fsync 0.9 s with `hugePages`, was 1.3 s; Amp-hosted 0.6 s; use `/mnt/fast` for caches, see `fastTmpfsGb`); 4 vCPU / 12 GiB / 20 GB per orb; the first spawn on a new Cloudflare host pulls the 1.8 GB image (40-50 s, then cached). Details in [docs/05](docs/benchmarks.md).
+Benchmarked as fast or faster than Amp-hosted orbs on first response and installs ([benchmarks](https://cf-orbs-site.mdick85.workers.dev/benchmarks), [method](docs/benchmarks.md#method)).
+
+Good to know: a paused orb keeps its files, not running processes (Cloudflare saves the disk only). One orb is at most 4 vCPU, 12 GiB memory and 20 GB disk.
 
 ## What it is
 

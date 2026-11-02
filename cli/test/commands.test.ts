@@ -357,7 +357,7 @@ async function fakeTemplates(root: string) {
   for (const [f, body] of [
     ["worker/src/index.ts", "export default {};\n"],
     ["image/Dockerfile", DOCKERFILE],
-    ["provider/Dockerfile", "FROM node:24-bookworm-slim\n"],
+    ["provider/Dockerfile", `FROM node:24-bookworm-slim@sha256:${"c".repeat(64)}\n`],
     ["dispatch/dispatch.sh", "#!/bin/sh\n"],
   ] as const) {
     await mkdir(join(root, f, ".."), { recursive: true });
@@ -1012,6 +1012,10 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(checks.map((c) => `${c.status} ${c.name}`)).toEqual([
       "PASS config",
       "PASS control token",
+      "PASS orb image pin",
+      "PASS provider image pin",
+      "PASS debugExec",
+      "SKIP secrets in git",
       "PASS deployment",
       "PASS health",
       "PASS status",

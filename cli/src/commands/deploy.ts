@@ -33,7 +33,8 @@ export async function deployProject(
 ): Promise<{ url: string; attempts: number; providerBuild: string }> {
   const { ui, paths } = ctx;
   const { config, state } = input;
-  await materialize(paths, { templates: ctx.templates });
+  const git = state.mode === "git";
+  await materialize(paths, { templates: ctx.templates, git });
   const missing = missingDockerfiles(paths, config);
   if (missing.length > 0) {
     throw new CliError(
@@ -70,7 +71,8 @@ export async function deployProject(
     ...state,
     url,
     workerName: config.name,
-    mode: config.providerHost,
+    // git mode stays git mode: Workers Builds still deploys from the repo
+    mode: git ? "git" : config.providerHost,
     deployedAt: new Date(ctx.now()).toISOString(),
     cliVersion: await cliVersion(),
   });

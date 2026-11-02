@@ -6,6 +6,8 @@
 //   cf-orbs.config.jsonc     user config (source of truth)
 //   image/Dockerfile         orb image, user-editable; upgrade bumps its digest; image/<key>.Dockerfile for extra keys
 //   .gitignore               generated; keeps .cf-orbs/ (and its control-token) out of git
+//                            (git mode: only control-token and state.json; Workers Builds needs the rest)
+//   package.json             git mode only: pins wrangler for Workers Builds
 //   .cf-orbs/
 //     wrangler.jsonc         generated
 //     worker/src/**          copied from templates on every deploy
@@ -34,6 +36,8 @@ export interface ProjectPaths {
   state: string;
   controlToken: string;
   gitignore: string;
+  /** git mode: root package.json that pins wrangler for Workers Builds */
+  packageJson: string;
 }
 
 export function projectPaths(dir: string): ProjectPaths {
@@ -49,6 +53,7 @@ export function projectPaths(dir: string): ProjectPaths {
     state: join(s, "state.json"),
     controlToken: join(s, "control-token"),
     gitignore: join(d, ".gitignore"),
+    packageJson: join(d, "package.json"),
   };
 }
 
@@ -61,7 +66,11 @@ export interface State {
   url?: string;
   accountId?: string;
   providerName?: string;
-  mode?: "cloudflare" | "external";
+  /**
+   * Provider host of the last init or deploy, or "git": init --no-deploy, Workers Builds deploys from a repo
+   * (the provider host is then cloudflare).
+   */
+  mode?: "cloudflare" | "external" | "git";
   workerName?: string;
   deployedAt?: string;
   cliVersion?: string;
@@ -134,14 +143,32 @@ export const GITIGNORE_LINES = [
   "node_modules/",
 ];
 
+/** Git mode (init --no-deploy): the generated files are committed, so only these stay out of git. */
+export const GIT_MODE_GITIGNORE_LINES = [
+  ".cf-orbs/control-token",
+  ".cf-orbs/state.json",
+  ".wrangler/",
+  "node_modules/",
+];
+
+/** Lines of the local layout that hide the generated files. Git mode removes them. */
+const LOCAL_ONLY_LINES = new Set([".cf-orbs/*", "!.cf-orbs/state.json"]);
+
 /** Add the cf-orbs lines to <dir>/.gitignore, keeping existing lines. */
-export async function ensureGitignore(p: ProjectPaths): Promise<void> {
+export async function ensureGitignore(p: ProjectPaths, git = false): Promise<void> {
   let cur = "";
   try {
     cur = await readFile(p.gitignore, "utf8");
   } catch {}
+  if (git && cur.split(/\r?\n/).some((l) => LOCAL_ONLY_LINES.has(l.trim()))) {
+    cur = cur
+      .split(/(?<=\n)/)
+      .filter((l) => !LOCAL_ONLY_LINES.has(l.trim()))
+      .join("");
+    await writeFile(p.gitignore, cur);
+  }
   const have = new Set(cur.split(/\r?\n/).map((l) => l.trim()));
-  const add = GITIGNORE_LINES.filter((l) => !have.has(l));
+  const add = (git ? GIT_MODE_GITIGNORE_LINES : GITIGNORE_LINES).filter((l) => !have.has(l));
   if (add.length === 0) return;
   const sep = cur === "" || cur.endsWith("\n") ? "" : "\n";
   const header = cur.includes("# cf-orbs") ? "" : "# cf-orbs (generated)\n";
@@ -156,7 +183,7 @@ const COPIED = ["worker", "provider", "dispatch"] as const;
  */
 export async function materialize(
   p: ProjectPaths,
-  opts: { templates?: string; configOverrides?: Partial<CfOrbsConfig> } = {},
+  opts: { templates?: string; configOverrides?: Partial<CfOrbsConfig>; git?: boolean } = {},
 ): Promise<{ wroteConfig: boolean; wroteDockerfile: boolean }> {
   const t = opts.templates ?? templatesDir();
   if (!existsSync(join(t, "worker", "src", "index.ts"))) {
@@ -187,7 +214,7 @@ export async function materialize(
     await writeFile(p.config, text);
     wroteConfig = true;
   }
-  await ensureGitignore(p);
+  await ensureGitignore(p, opts.git);
   return { wroteConfig, wroteDockerfile };
 }
 
@@ -256,4 +283,18 @@ export async function cliVersion(): Promise<string> {
   } catch {
     return "0.0.0";
   }
+}
+
+/** Git mode deploy command: Workers Builds runs it in the repo root. */
+export const GIT_DEPLOY_COMMAND = "npx wrangler deploy --config .cf-orbs/wrangler.jsonc";
+
+/** Root package.json for git mode: Workers Builds installs the wrangler version it names. */
+export function gitPackageJson(name: string, wrangler: string): string {
+  const pkg = {
+    name,
+    private: true,
+    scripts: { deploy: "wrangler deploy --config .cf-orbs/wrangler.jsonc" },
+    devDependencies: { wrangler },
+  };
+  return `${JSON.stringify(pkg, null, 2)}\n`;
 }

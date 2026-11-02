@@ -46,6 +46,9 @@ export const COMMANDS: Record<string, Command> = {
       "--provider-name <name>           Amp provider name, as in Amp Settings → Orbs (default cf-orbs)",
       "--subdomain <name>               workers.dev subdomain to register if the account has none",
       "--vcpu <1|2|3|4>                 orb size: N vCPU, N x 3 GiB, 20 GB disk (default 4; 2 is cheaper)",
+      "--name <name>                    Worker name (default cf-orbs; a second install needs another)",
+      "--no-deploy                      preview: no Docker, no deploy. Make a git repo for Workers Builds,",
+      "                                 create the Worker and its secrets, print the dashboard steps",
     ],
     flags: {
       provider: { type: "string" },
@@ -54,6 +57,8 @@ export const COMMANDS: Record<string, Command> = {
       "provider-name": { type: "string" },
       subdomain: { type: "string" },
       vcpu: { type: "string" },
+      name: { type: "string" },
+      "no-deploy": { type: "boolean" },
     },
     dirPositional: true,
     run: initCommand,

@@ -4,10 +4,34 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-02
+
 ### Added
 
-- `init` plan check: before it scaffolds or builds the image, `init` runs `wrangler containers list`. A clear plan or login error stops init in seconds, not after the 1.8 GB push. Any other error is a warning.
-- `init` self-test: after the deploy, `init` waits for the prewarm instances (throwaway orbs from the new image). It prints `self-test: orb image starts (N of N ready in X s)`, fails with a one-line fix if none becomes ready, and warns if they are still starting after 3 min. It is skipped when `prewarm` is 0.
+- `cf-orbs init --no-deploy` (preview): install without Docker. Workers Builds builds the orb and provider images in your Cloudflare account from your git repo and deploys on each push. See [docs/install-workers-builds.md](docs/install-workers-builds.md). Without the flag, `init` deploys with local Docker as before.
+- `init --no-deploy` writes `package.json` (wrangler pinned to the CLI's version), `package-lock.json`, a `.gitignore` and a first git commit. It stops if a staged file holds a token.
+- `init --no-deploy` creates the Worker, sets its secrets and prints the dashboard settings to connect the repo. `--json` gives `mode: "git"` and a `settings` object. The Amp token is optional; a later `init --no-deploy --token-file <file>` sets it.
+- `cf-orbs init --name <worker>` sets the Worker name.
+- `init` plan check: before it builds the image, `init` runs `wrangler containers list`. A clear plan or login error stops `init` in seconds, not after the 1.8 GB push. Any other error is a warning.
+- `init` self-test: after the deploy, `init` waits up to 3 min for the prewarm instances and prints `self-test: orb image starts (N of N ready in X s)`. It fails with a fix line when none starts. It is skipped when `prewarm` is 0.
+- `init --no-deploy` skips the self-test, because the build runs later. A rerun after a build shows the last prewarm result.
+- `cf-orbs upgrade --no-deploy` writes `.cf-orbs/wrangler.jsonc` and says to commit and push.
+- `cf-orbs doctor` checks the project files: Dockerfiles pinned by digest, `debugExec` off (WARN when on), and no Amp or control token in files that git tracks.
+- `cf-orbs doctor` in a `--no-deploy` project also checks that `.gitignore` keeps out the control token and `state.json`, and that `package.json` pins the CLI's wrangler.
+
+### Changed
+
+- `.cf-orbs/wrangler.jsonc` sets `workers_dev: true` and `preview_urls: false`. Wrangler no longer warns about them.
+- In a `--no-deploy` project, a failed health check points to the Workers Builds build.
+
+### Docs
+
+- New: [docs/install-workers-builds.md](docs/install-workers-builds.md), the Docker-free install with Workers Builds. Measured: first build 10 min 35 s, upgrade 5 min 39 s.
+- AGENTS.md: the Workers Paid check is now done by `init`; the Docker-free path is linked.
+
+### Upgrade from 0.1.x
+
+Run `npx cf-orbs@0.2.0 upgrade` (or `npx cf-orbs@0.2.0 deploy`). Your config does not change. Paused orbs survive. The provider restarts once only if its image changed.
 
 ## [0.1.1] - 2026-11-02
 
@@ -93,6 +117,7 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.2.0
 [0.1.1]: https://github.com/meirdick/cf-orbs/releases/tag/v0.1.1
 [0.1.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.1.0

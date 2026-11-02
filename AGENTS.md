@@ -4,6 +4,8 @@ For an AI agent that installs cf-orbs for a user. Run the commands in order. Sto
 
 Developing this repo instead of installing it? Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
+No Docker on the user's machine? Follow [docs/install-workers-builds.md](docs/install-workers-builds.md) (`init --no-deploy`, preview) instead of steps 1-2; it needs a GitHub or GitLab repo and dashboard steps that the user does.
+
 ## 0. Ask the user for
 
 1. An Amp provider token (`aop_live_…`) and the provider name. The user makes both in Amp → Settings → Orbs → Add Provider. Do not make up a name; it must match Amp.
@@ -26,6 +28,8 @@ npx wrangler whoami     # must show "You are logged in" and the account
 - The account must be on Workers Paid. `init` asks wrangler to list Containers before the image build and stops with `Containers need the Workers Paid plan` on a clear plan error. The check is best effort: the deploy fails with the same message if it misses.
 
 ## 2. Install
+
+`npx cf-orbs` gets the CLI from npm. You do not need a clone. If npx asks `Ok to proceed?`, use `npx --yes cf-orbs` instead. To check the CLI, run `npx cf-orbs --version`.
 
 ```sh
 mkdir -p ~/cf-orbs-install && cd ~/cf-orbs-install

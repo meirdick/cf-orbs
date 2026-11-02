@@ -53,6 +53,9 @@ export const runProcess: Runner = (cmd, args, o = {}) =>
     });
   });
 
+/** The wrangler version the CLI depends on (cli/package.json). Git mode pins the same version in package.json. */
+export const WRANGLER_PIN = "4.156.0";
+
 /** [command, ...prefix args] that runs the pinned wrangler. Prefers the CLI's own dependency over npx. */
 export function wranglerCommand(): [string, string[]] {
   try {
@@ -60,7 +63,7 @@ export function wranglerCommand(): [string, string[]] {
     const bin = join(dirname(req.resolve("wrangler/package.json")), "bin", "wrangler.js");
     if (existsSync(bin)) return [process.execPath, [bin]];
   } catch {}
-  return [process.platform === "win32" ? "npx.cmd" : "npx", ["--yes", "wrangler@4.156.0"]];
+  return [process.platform === "win32" ? "npx.cmd" : "npx", ["--yes", `wrangler@${WRANGLER_PIN}`]];
 }
 
 export interface Wrangler {

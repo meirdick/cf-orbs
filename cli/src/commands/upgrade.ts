@@ -15,7 +15,7 @@ import {
 } from "../config.js";
 import type { Ctx } from "../context.js";
 import { CliError } from "../errors.js";
-import { readState, requireControlToken } from "../project.js";
+import { materialize, readState, requireControlToken, writeWranglerConfig } from "../project.js";
 import { deployProject, restartProviderAfterDeploy, startPrewarm } from "./deploy.js";
 import { AMP_CACHE_STEPS } from "./snapshots.js";
 
@@ -108,7 +108,18 @@ export async function upgradeCommand(ctx: Ctx): Promise<number> {
     "awake orbs keep the old Worker code until they pause; keep the old key until their snapshots expire (30 days)",
   );
   if (flagBool(ctx.args, "no-deploy")) {
-    ui.out("Run cf-orbs deploy to build and push the new image.");
+    const state = await readState(paths);
+    if (state.mode === "git") {
+      // Workers Builds deploys the committed wrangler.jsonc, so write it now with the new images entry
+      await materialize(paths, { templates: ctx.templates, git: true });
+      await writeWranglerConfig(paths, await loadConfig(paths.config), state.accountId);
+      ui.step("upgrade: wrote .cf-orbs/wrangler.jsonc");
+    }
+    ui.out(
+      state.mode === "git"
+        ? "Commit and push: Workers Builds builds and deploys the new image."
+        : "Run cf-orbs deploy to build and push the new image.",
+    );
     for (const l of AMP_CACHE_STEPS) ui.out(l);
     ui.result({ ok: true, changed: true, deployed: false, oldKey: p.oldKey, nextSteps: AMP_CACHE_STEPS });
     return 0;

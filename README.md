@@ -35,7 +35,7 @@ When Amp pauses an orb, cf-orbs saves the disk as a snapshot and stops the conta
 | You need | Check |
 | --- | --- |
 | Node 22 or later (wrangler 4 needs it) | `node --version` |
-| Docker, running. wrangler builds the orb image on your machine | `docker info` |
+| Docker, running. wrangler builds the orb image on your machine (not for the [Workers Builds path](#install-without-docker-workers-builds-preview)) | `docker info` |
 | A Cloudflare account on **Workers Paid** ($5/month; Containers need it) | Dashboard → Workers & Pages → Plans |
 | wrangler logged in to that account | `npx wrangler login`, then `npx wrangler whoami` |
 | An Amp provider token (`aop_live_…`) | Amp → Settings → Orbs → Add Provider. Note the provider name you type there |
@@ -95,6 +95,38 @@ node cli/bin/cf-orbs.js init ../my-orbs --provider-name <name>   # asks for the 
 
 Then use `node <repo>/cli/bin/cf-orbs.js` wherever this README says `cf-orbs`, with `--dir ../my-orbs` or from inside that directory.
 
+### Install without Docker (Workers Builds, preview)
+
+No Docker on your machine? `init --no-deploy` makes a git repo and the Worker with its secrets, but does not deploy. You push the repo to GitHub or GitLab and connect it in the Cloudflare dashboard. Workers Builds then builds both images in your account and deploys on each push. Measured: first build 10.6 min, upgrade 5.6 min, plus 2-4 min in the queue.
+
+```sh
+npx cf-orbs init --no-deploy --provider-name <name from Amp> --token-file <file>
+```
+
+It prints the dashboard settings to use. Full procedure and caveats: [docs/install-workers-builds.md](docs/install-workers-builds.md). This is a preview: the default install above (local Docker) and all defaults do not change.
+
+### What init validates
+
+Before the deploy, `init` stops with one `Failed: … — fix: …` line when:
+
+- Node is older than 22.
+- Docker does not answer `docker info` (not checked with `--no-deploy`).
+- wrangler is not logged in, sees no account, or sees several and you gave no `--account-id` (or an id that `wrangler whoami` does not list).
+- There is no Amp token, or it is empty or has spaces (a token without `aop_live_` gives a warning). With `--no-deploy` the token is optional.
+- `cf-orbs.config.jsonc` is not valid: unknown keys, sizes out of range, a bad name or image key.
+- An extra image key has no `image/<key>.Dockerfile`.
+- The account has no workers.dev subdomain and you gave no `--subdomain` (in a terminal, `init` asks for one).
+- `wrangler containers list` fails with a clear plan or login error (Workers Paid is needed). Any other error is a warning.
+
+After the deploy, `init` checks that `/v1/health` answers, that `/v1/status` accepts the control token, that at least one prewarm instance starts from the new image (self-test; skipped when `prewarm` is 0, and with `--no-deploy` until a build has run), and that the provider runs for 15 s with no token rejection and no second provider on the token.
+
+`cf-orbs doctor` also checks the project files, in every mode:
+
+- `image/Dockerfile` (and each extra image key) and the provider image use `FROM <image>@sha256:<digest>`.
+- `debugExec` is `false` (WARN when `true`).
+- No `aop_live_` token and no control token value is in a file that git tracks (SKIP outside a git repo).
+- `--no-deploy` projects only: `.gitignore` keeps out `.cf-orbs/control-token` and `.cf-orbs/state.json`, and `package.json` pins the wrangler version that cf-orbs uses.
+
 ## What you get
 
 - Orbs that run on your Cloudflare account. The repo checkout, build output and saved disks stay there.
@@ -149,7 +181,7 @@ Example: 120 awake hours a month at 20% CPU costs about $27.50 a month in total 
 
 | Command | Does |
 | --- | --- |
-| `cf-orbs init [dir]` | Scaffold, deploy and check a provider. Flags: `--provider cloudflare\|external`, `--token-file`, `--account-id`, `--provider-name`, `--subdomain`, `--vcpu <1\|2\|3\|4>` |
+| `cf-orbs init [dir]` | Scaffold, deploy and check a provider. Flags: `--provider cloudflare\|external`, `--token-file`, `--account-id`, `--provider-name`, `--subdomain`, `--vcpu <1\|2\|3\|4>`, `--name <worker>`, `--no-deploy` (preview: [Workers Builds](docs/install-workers-builds.md), no Docker) |
 | `cf-orbs status [orb]` | Install status (provider, awake orbs, snapshots), or one orb |
 | `cf-orbs logs <orb>` | Redacted bootstrap log of one orb. `--lines N` (default 200) |
 | `cf-orbs logs --provider` | Redacted provider log (last 20 lines) |
@@ -240,7 +272,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Status and known gaps
 
-v0.1. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
+v0.2.0. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
 
 Known gaps:
 
@@ -263,6 +295,7 @@ Method, results and costs: [docs/benchmarks.md](docs/benchmarks.md). The substra
 | Doc | Covers |
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Install guide for an AI agent at a terminal |
+| [Install without Docker](docs/install-workers-builds.md) | Preview: Workers Builds builds and deploys from a git repo |
 | [Provider host](provider/README.md) | Cloudflare-hosted vs external provider, token rotation |
 | [Orb image](image/README.md) | The pinned image, toolchains, why snapshots are tied to it |
 | [Dispatch](dispatch/README.md) | The program Amp runs per job, and its protocol |

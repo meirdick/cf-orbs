@@ -1,4 +1,5 @@
-// cf-orbs doctor: PASS/FAIL per check with a one-line fix, plus INFO hints that never fail. Read-only: never starts a provider or an orb.
+// cf-orbs doctor: PASS/FAIL per check with a one-line fix, plus INFO hints and WARN lines that never fail.
+// Read-only: never starts a provider or an orb.
 
 import { existsSync } from "node:fs";
 import { collectImageKeys, expectOk, providerInfo } from "../api.js";
@@ -6,11 +7,12 @@ import { type CfOrbsConfig, CONFIG_FILE, loadConfig, orbImageKeys } from "../con
 import { connect } from "../connect.js";
 import type { Ctx } from "../context.js";
 import { CliError, toFailedLine } from "../errors.js";
+import { fileChecks } from "../file-checks.js";
 import { fileMode, readState } from "../project.js";
 import { classifyDeployFailure, lastErrorLine, makeWrangler } from "../wrangler.js";
 import { AMP_CACHE_HINT } from "./snapshots.js";
 
-export type CheckStatus = "PASS" | "FAIL" | "SKIP" | "INFO";
+export type CheckStatus = "PASS" | "FAIL" | "SKIP" | "INFO" | "WARN";
 export interface Check {
   name: string;
   status: CheckStatus;
@@ -135,6 +137,12 @@ export async function runDoctor(ctx: Ctx): Promise<Check[]> {
       ),
     );
   } else checks.push(pass("control token", "present, mode 600"));
+  checks.push(
+    ...(await fileChecks(ctx.run, ctx.paths, config, {
+      git: state.mode === "git",
+      templates: ctx.templates,
+    })),
+  );
 
   const name = config?.name ?? state.workerName ?? "cf-orbs";
   const w = makeWrangler(ctx.run, { accountId: state.accountId });
@@ -175,18 +183,29 @@ export async function runDoctor(ctx: Ctx): Promise<Check[]> {
     checks.push(failed("health", e));
   }
   let status: unknown;
+  // git mode: Workers Builds deploys, so the fix is the build, not cf-orbs deploy
+  const apiFailed = (n: string, e: unknown): Check =>
+    state.mode === "git" && e instanceof CliError
+      ? failed(
+          n,
+          new CliError(
+            e.cause_,
+            `wait for the Workers Builds build to finish (Workers & Pages → ${name} → Deployments), or open its build log`,
+          ),
+        )
+      : failed(n, e);
   if (api) {
     try {
       expectOk(await api.get("/v1/health"), "health");
       checks.push(pass("health", `${api.url}/v1/health ok`));
     } catch (e) {
-      checks.push(failed("health", e));
+      checks.push(apiFailed("health", e));
     }
     try {
       status = expectOk(await api.get("/v1/status"), "status");
       checks.push(pass("status", "/v1/status ok (control token accepted)"));
     } catch (e) {
-      checks.push(failed("status", e));
+      checks.push(apiFailed("status", e));
     }
   }
   // Names only: wrangler secret list never returns values.

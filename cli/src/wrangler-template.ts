@@ -49,6 +49,9 @@ export function buildWranglerConfig(c: CfOrbsConfig, o: WranglerOptions = {}): R
     main: "worker/src/index.ts",
     compatibility_date: COMPATIBILITY_DATE,
     compatibility_flags: ["nodejs_compat"],
+    // explicit, so wrangler does not warn: the control plane is on workers.dev; preview URLs are not used
+    workers_dev: true,
+    preview_urls: false,
     observability: { enabled: true },
     containers: [
       orbContainer,

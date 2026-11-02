@@ -145,7 +145,7 @@ describe("init plan: external mode", () => {
       "done",
     ]);
     expect(s.find((x) => x.kind === "deploy")).toEqual({ kind: "deploy", secrets: ["CONTROL_TOKEN"] });
-    expect(s.find((x) => x.kind === "scaffold")).toEqual({ kind: "scaffold", mode: "external" });
+    expect(s.find((x) => x.kind === "scaffold")).toEqual({ kind: "scaffold", mode: "external", git: false });
   });
   it("uses the given provider name in the final command", () => {
     expect(plan(opts({ mode: "external", providerName: "my-orbs" }), probes()).at(-1)).toEqual({

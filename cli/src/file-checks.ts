@@ -80,9 +80,12 @@ export async function orbImagePinCheck(p: ProjectPaths, c?: CfOrbsConfig): Promi
 /** The provider image cf-orbs builds: the project copy (.cf-orbs/provider) if there is one, else the template. */
 export async function providerImagePinCheck(p: ProjectPaths, templates = templatesDir()): Promise<Check> {
   const copy = join(p.stateDir, "provider", "Dockerfile");
+  const tpl = join(templates, "provider", "Dockerfile");
+  // In a source checkout the templates are synced at build time; before that, read the source file.
+  const src = join(templates, "..", "..", "provider", "Dockerfile");
   const [file, label] = existsSync(copy)
     ? [copy, ".cf-orbs/provider/Dockerfile"]
-    : [join(templates, "provider", "Dockerfile"), "provider/Dockerfile (CLI template)"];
+    : [existsSync(tpl) || !existsSync(src) ? tpl : src, "provider/Dockerfile (CLI template)"];
   return pinCheck(
     "provider image pin",
     file,

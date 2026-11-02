@@ -4,6 +4,12 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-02
+
+### Fixed
+
+- `cf-orbs doctor` read the provider Dockerfile from the CLI templates only. In a source checkout before `npm run build` that file does not exist, so the check failed. It now reads the source file in that case. 0.2.0 was tagged but not published because of this test failure.
+
 ## [0.2.0] - 2026-11-02
 
 ### Added
@@ -117,7 +123,8 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/meirdick/cf-orbs/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.2.0
 [0.1.1]: https://github.com/meirdick/cf-orbs/releases/tag/v0.1.1
 [0.1.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.1.0

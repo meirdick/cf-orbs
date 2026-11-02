@@ -272,7 +272,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Status and known gaps
 
-v0.2.0. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
+v0.2.1. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
 
 Known gaps:
 

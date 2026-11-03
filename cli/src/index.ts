@@ -43,7 +43,7 @@ export const COMMANDS: Record<string, Command> = {
       "--provider cloudflare|external   where amp orb provider runs (default cloudflare)",
       "--token-file <file>              Amp provider token file (else AMP_ORB_PROVIDER_TOKEN, else prompt)",
       "--account-id <id>                Cloudflare account (else CLOUDFLARE_ACCOUNT_ID, else ask)",
-      "--provider-name <name>           Amp provider name, as in Amp Settings → Orbs (else AMP_ORB_PROVIDER_NAME, saved name, a config name other than cf-orbs, then cloudflare)",
+      "--provider-name <name>           Amp provider name, as in Amp Settings → Orbs (default cloudflare; AMP_ORB_PROVIDER_NAME or a saved name wins)",
       "--subdomain <name>               workers.dev subdomain to register if the account has none",
       "--vcpu <1|2|3|4>                 orb size: N vCPU, N x 3 GiB, 20 GB disk (default 4; 2 is cheaper)",
       "--name <name>                    Worker name (default cf-orbs; a second install needs another)",

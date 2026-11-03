@@ -58,7 +58,7 @@ export interface InitOptions {
   /** --provider-name, AMP_ORB_PROVIDER_NAME or a saved name was given (else interactive init asks) */
   providerNameExplicit?: boolean;
   /** Where providerName came from: flag or env are explicit; config and default were not given */
-  providerNameSource: "flag" | "env" | "saved" | "config" | "default";
+  providerNameSource: "flag" | "env" | "saved" | "default";
   /** --subdomain / CF_ORBS_SUBDOMAIN: workers.dev subdomain to register if the account has none */
   subdomain?: string;
   /** --vcpu 1-4: write instance {vcpu N, memoryMib N*3072, diskMb 20000}. Not given: keep the config (default 4). */
@@ -479,10 +479,7 @@ export async function runInit(ctx: Ctx, o: InitOptions, steps: InitStep[]): Prom
         break;
       case "amp-token":
         // No interactive name question here: say so if the name is a fallback, not given
-        if (
-          s.source !== "prompt" &&
-          (o.providerNameSource === "config" || o.providerNameSource === "default")
-        )
+        if (s.source !== "prompt" && o.providerNameSource === "default")
           ui.warn(
             `provider name ${providerName} was not given explicitly; it must match the name in Amp Settings → Orbs (pass --provider-name <name> if it differs)`,
           );
@@ -939,9 +936,8 @@ export function parseVcpuFlag(v: string | undefined): number | undefined {
   return Number(v);
 }
 
-/** Default Amp provider name. The Worker name default is separate: cf-orbs. */
+/** Default Amp provider name when none is given. Installs from before 0.2.3 keep their saved name (often cf-orbs). The Worker name default is separate: cf-orbs. */
 export const DEFAULT_PROVIDER_NAME = "cloudflare";
-const DEFAULT_WORKER_NAME = "cf-orbs";
 const WORKER_NAME_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 export function initOptions(
@@ -963,9 +959,6 @@ export function initOptions(
     );
   const explicitName =
     flagString(ctx.args, "provider-name") ?? ctx.env.AMP_ORB_PROVIDER_NAME ?? existing?.providerName;
-  // The config name is the Worker name. Use it only when it is not the default Worker name.
-  const configProviderName =
-    existing?.name !== undefined && existing.name !== DEFAULT_WORKER_NAME ? existing.name : undefined;
   return {
     providerNameExplicit: explicitName !== undefined,
     subdomain: flagString(ctx.args, "subdomain") ?? ctx.env.CF_ORBS_SUBDOMAIN ?? undefined,
@@ -980,7 +973,6 @@ export function initOptions(
       flagString(ctx.args, "provider-name") ??
       ctx.env.AMP_ORB_PROVIDER_NAME ??
       existing?.providerName ??
-      configProviderName ??
       DEFAULT_PROVIDER_NAME,
     providerNameSource:
       flagString(ctx.args, "provider-name") !== undefined
@@ -989,9 +981,7 @@ export function initOptions(
           ? "env"
           : existing?.providerName !== undefined
             ? "saved"
-            : configProviderName !== undefined
-              ? "config"
-              : "default",
+            : "default",
   };
 }
 

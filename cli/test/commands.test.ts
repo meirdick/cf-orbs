@@ -693,7 +693,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     ).toEqual(["f", "flag"]);
     expect(pick([], { AMP_ORB_PROVIDER_NAME: "e" }, { providerName: "s", name: "c" })).toEqual(["e", "env"]);
     expect(pick([], {}, { providerName: "s", name: "c" })).toEqual(["s", "saved"]);
-    expect(pick([], {}, { name: "cf-orbs-small" })).toEqual(["cf-orbs-small", "config"]);
+    expect(pick([], {}, { name: "cf-orbs-small" })).toEqual(["cloudflare", "default"]);
     expect(pick([], {}, { name: "cf-orbs" })).toEqual(["cloudflare", "default"]);
     expect(pick([], {})).toEqual(["cloudflare", "default"]);
   });

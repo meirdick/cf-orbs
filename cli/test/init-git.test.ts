@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseArgs } from "../src/args";
 import { runDoctor } from "../src/commands/doctor";
-import { gatherProbes, initOptions, plan, runInit } from "../src/commands/init";
+import { BACKUP_LINE, gatherProbes, initOptions, plan, runInit } from "../src/commands/init";
 import { AMP_DEFAULT_IMAGE_REPO, DEFAULT_CONFIG, loadConfig, parseJsonc } from "../src/config";
 import { type Ctx, makeCtx } from "../src/context";
 import { readState } from "../src/project";
@@ -215,6 +215,9 @@ describe("init --no-deploy (git mode)", () => {
     );
     expect(out).not.toContain(TOKEN);
     expect(r.command).toBe('amp -ox "hello from cf-orbs" --orb-provider cloudflare-wb2');
+    // one back up line, after the dashboard steps; initCommand prints the amp command after it
+    expect(s.lines.filter((l) => l.startsWith("back up:"))).toHaveLength(1);
+    expect(s.lines.at(-1)).toBe(BACKUP_LINE);
     expect(r.git?.settings).toEqual({
       worker: "cf-orbs-wb2",
       branch: "main",

@@ -2,7 +2,7 @@
   "name": "@cf-orbs/worker",
   "private": true,
   "type": "module",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "scripts": {
     "typecheck": "tsc -p .",
     "deploy": "wrangler deploy",

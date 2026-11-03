@@ -4,6 +4,17 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-03
+
+### Changed
+
+- The default Amp provider name is `cloudflare`, not `cf-orbs`. The order is `--provider-name`, `AMP_ORB_PROVIDER_NAME`, the saved name, the config `name` (only if it is not `cf-orbs`), then `cloudflare`. Existing installs keep their saved name. The Worker name default is still `cf-orbs`.
+
+### Added
+
+- `init` prints one `back up:` line before the final `amp` command. It names the files to keep and links the guide.
+- README: a Back up section. Docs: [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
+
 ## [0.2.2] - 2026-11-03
 
 ### Changed
@@ -137,7 +148,8 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/meirdick/cf-orbs/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/meirdick/cf-orbs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/meirdick/cf-orbs/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.2.0

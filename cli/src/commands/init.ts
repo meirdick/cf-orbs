@@ -113,6 +113,10 @@ export const SELFTEST_WAIT_MS = 180_000;
 export const PROVIDER_STABLE_MS = 15_000;
 const CRON_PERIOD_MS = 5 * 60_000;
 
+/** One line at the end of a successful init, before the amp command. */
+export const BACKUP_LINE =
+  "back up: cf-orbs.config.jsonc and image/. Guide: https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/";
+
 export function helloCommand(providerName: string): string {
   return `amp -ox "hello from cf-orbs" --orb-provider ${providerName}`;
 }
@@ -712,6 +716,7 @@ export async function runInit(ctx: Ctx, o: InitOptions, steps: InitStep[]): Prom
       case "done":
         command = s.command === helloCommand(o.providerName) ? helloCommand(providerName) : s.command;
         ui.step(`provider name ${providerName} must match the name in Amp Settings → Orbs`);
+        ui.out(BACKUP_LINE);
         break;
     }
   }
@@ -934,6 +939,9 @@ export function parseVcpuFlag(v: string | undefined): number | undefined {
   return Number(v);
 }
 
+/** Default Amp provider name. The Worker name default is separate: cf-orbs. */
+export const DEFAULT_PROVIDER_NAME = "cloudflare";
+const DEFAULT_WORKER_NAME = "cf-orbs";
 const WORKER_NAME_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 
 export function initOptions(
@@ -955,6 +963,9 @@ export function initOptions(
     );
   const explicitName =
     flagString(ctx.args, "provider-name") ?? ctx.env.AMP_ORB_PROVIDER_NAME ?? existing?.providerName;
+  // The config name is the Worker name. Use it only when it is not the default Worker name.
+  const configProviderName =
+    existing?.name !== undefined && existing.name !== DEFAULT_WORKER_NAME ? existing.name : undefined;
   return {
     providerNameExplicit: explicitName !== undefined,
     subdomain: flagString(ctx.args, "subdomain") ?? ctx.env.CF_ORBS_SUBDOMAIN ?? undefined,
@@ -969,8 +980,8 @@ export function initOptions(
       flagString(ctx.args, "provider-name") ??
       ctx.env.AMP_ORB_PROVIDER_NAME ??
       existing?.providerName ??
-      existing?.name ??
-      "cf-orbs",
+      configProviderName ??
+      DEFAULT_PROVIDER_NAME,
     providerNameSource:
       flagString(ctx.args, "provider-name") !== undefined
         ? "flag"
@@ -978,7 +989,7 @@ export function initOptions(
           ? "env"
           : existing?.providerName !== undefined
             ? "saved"
-            : existing?.name !== undefined
+            : configProviderName !== undefined
               ? "config"
               : "default",
   };

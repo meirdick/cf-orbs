@@ -8,7 +8,7 @@ No Docker on the user's machine? Follow [docs/install-workers-builds.md](docs/in
 
 ## 0. Ask the user for
 
-1. An Amp provider token (`aop_live_…`) and the provider name. The user makes both in Amp → Settings → Orbs → Add Provider. Do not make up a name; it must match Amp.
+1. An Amp provider token (`aop_live_…`) and the provider name. The user makes both in Amp → Settings → Orbs → Add Provider. Do not make up a name; it must match Amp. If you pass no `--provider-name`, `init` uses the saved name, then the config `name` (if not `cf-orbs`), then `cloudflare`, and warns.
 2. The Cloudflare account id, if their wrangler login has more than one account.
 3. A project directory (default `~/cf-orbs-install`).
 
@@ -90,6 +90,10 @@ The first spawn on a new host starts from the image (about 45 s), then Amp sets 
 | Worker logs, live | `npx wrangler tail --config .cf-orbs/wrangler.jsonc` |
 | Machine-readable output | add `--json` to any command |
 | Old snapshot data (`prunable` in `status`) | `npx cf-orbs snapshots prune` lists it. Ask the user before you add `--yes`: it deletes data |
+
+## Back up
+
+`init` prints a `back up:` line before the final `amp` line. Tell the user to keep `cf-orbs.config.jsonc` and `image/` in a private git repo. The control token can be made again. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
 
 ## Do not
 

@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { parseArgs } from "../src/args";
 import { runDoctor, statusChecks } from "../src/commands/doctor";
 import {
+  BACKUP_LINE,
   gatherProbes,
   initOptions,
   judgeProviderLog,
@@ -617,8 +618,8 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     const r = await runInit(ctx, o, plan(o, probes));
     expect(r).toEqual({
       url: "https://cf-orbs.sub.workers.dev",
-      command: 'amp -ox "hello from cf-orbs" --orb-provider cf-orbs',
-      providerName: "cf-orbs",
+      command: 'amp -ox "hello from cf-orbs" --orb-provider cloudflare',
+      providerName: "cloudflare",
     });
     expect(deploySecrets).toHaveLength(1);
     expect(deploySecrets[0]?.AMP_ORB_PROVIDER_TOKEN).toBe(token);
@@ -639,7 +640,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(cap.lines).toContain("prewarm: started 2 instances in the background; check cf-orbs status");
     // no --provider-name: the name is the default, so init warns that it must match Amp
     expect(cap.lines).toContain(
-      "provider name cf-orbs was not given explicitly; it must match the name in Amp Settings → Orbs (pass --provider-name <name> if it differs)",
+      "provider name cloudflare was not given explicitly; it must match the name in Amp Settings → Orbs (pass --provider-name <name> if it differs)",
     );
     expect(calls.length).toBeGreaterThanOrEqual(6);
     const state = await readState(ctx.paths);
@@ -647,7 +648,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
       url: "https://cf-orbs.sub.workers.dev",
       accountId: "acct1",
       mode: "cloudflare",
-      providerName: "cf-orbs",
+      providerName: "cloudflare",
     });
     const stateRaw = await readFile(ctx.paths.state, "utf8");
     expect(stateRaw).not.toContain(token);
@@ -666,7 +667,45 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     await runInit(again.ctx, o2, p2);
     expect(again.deploySecrets[0]).toEqual({ CONTROL_TOKEN: deploySecrets[0]?.CONTROL_TOKEN });
     // the name is saved from the first run: no warning on the re-run
-    expect(again.cap.lines).not.toContain("provider name cf-orbs was not given explicitly");
+    expect(again.cap.lines).not.toContain("provider name cloudflare was not given explicitly");
+  });
+
+  it("default provider name is cloudflare, with the fallback warning", async () => {
+    const { ctx, cap } = setup(["--non-interactive"], { AMP_ORB_PROVIDER_TOKEN: "aop_live_x1234567" });
+    const o = initOptions(ctx);
+    expect(o.providerName).toBe("cloudflare");
+    expect(o.providerNameSource).toBe("default");
+    await runInit(ctx, o, plan(o, { ...(await gatherProbes(ctx)), tty: false }));
+    expect(cap.lines.join("\n")).toContain("provider name cloudflare was not given explicitly");
+  });
+
+  it("provider name chain: flag, env, saved, config name (not cf-orbs), default", () => {
+    const pick = (
+      args: string[],
+      env: Record<string, string>,
+      existing?: Parameters<typeof initOptions>[1],
+    ) => {
+      const o = initOptions(setup(args, env).ctx, existing);
+      return [o.providerName, o.providerNameSource];
+    };
+    expect(
+      pick(["--provider-name", "f"], { AMP_ORB_PROVIDER_NAME: "e" }, { providerName: "s", name: "c" }),
+    ).toEqual(["f", "flag"]);
+    expect(pick([], { AMP_ORB_PROVIDER_NAME: "e" }, { providerName: "s", name: "c" })).toEqual(["e", "env"]);
+    expect(pick([], {}, { providerName: "s", name: "c" })).toEqual(["s", "saved"]);
+    expect(pick([], {}, { name: "cf-orbs-small" })).toEqual(["cf-orbs-small", "config"]);
+    expect(pick([], {}, { name: "cf-orbs" })).toEqual(["cloudflare", "default"]);
+    expect(pick([], {})).toEqual(["cloudflare", "default"]);
+  });
+
+  it("success prints the back up line last, before the amp command", async () => {
+    const { ctx, cap } = setup(["--non-interactive"], { AMP_ORB_PROVIDER_TOKEN: "aop_live_x1234567" });
+    const o = initOptions(ctx);
+    const r = await runInit(ctx, o, plan(o, { ...(await gatherProbes(ctx)), tty: false }));
+    expect(cap.lines.at(-1)).toBe(BACKUP_LINE);
+    expect(cap.lines.filter((l) => l.startsWith("back up:"))).toHaveLength(1);
+    expect(r.command).toContain("amp -ox");
+    expect(BACKUP_LINE).toContain("cf-orbs.config.jsonc and image/");
   });
 
   it("provider name given with --provider-name: no warning, used in the final command", async () => {
@@ -762,7 +801,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     );
     const o = initOptions(ctx);
     const r = await runInit(ctx, o, plan(o, { ...(await gatherProbes(ctx)), tty: false }));
-    expect(r.command).toContain("--orb-provider cf-orbs");
+    expect(r.command).toContain("--orb-provider cloudflare");
     expect(calls).toContain("POST /v1/provider/start");
     expect(cap.lines.join("\n")).toContain("waiting up to 390 s");
   });
@@ -778,7 +817,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(out).toContain("CF_ORBS_URL=https://cf-orbs.sub.workers.dev");
     expect(out).toContain(`CF_ORBS_CONTROL_TOKEN_FILE=${ctx.paths.controlToken}`);
     expect(out).not.toContain(deploySecrets[0]?.CONTROL_TOKEN);
-    expect(r.command).toContain("--orb-provider cf-orbs");
+    expect(r.command).toContain("--orb-provider cloudflare");
     expect(parseConfigText(await readFile(ctx.paths.config, "utf8")).providerHost).toBe("external");
   });
 

@@ -70,7 +70,7 @@ What `init` does:
 amp -ox "hello from cf-orbs" --orb-provider <name>
 ```
 
-The name after `--orb-provider` must match the provider name in Amp Settings. In the Amp app, pick the provider under **Self-Hosted** when you start a thread.
+The name after `--orb-provider` must match the provider name in Amp Settings. If you do not pass `--provider-name`, `init` uses the saved name, then the config `name` (only if it is not `cf-orbs`), then `cloudflare`. In the Amp app, pick the provider under **Self-Hosted** when you start a thread.
 
 `init` is safe to run again. It keeps the control token, and it keeps the Amp token secret unless you give a new one.
 
@@ -225,6 +225,10 @@ After `cf-orbs deploy`, an orb that is awake keeps the old Worker code until it 
 
 `cf-orbs deploy` then starts `prewarm` throwaway instances in the background (`prewarm: started 2 instances in the background`); `cf-orbs status` shows how fast they were ready.
 
+### Back up
+
+Running orbs need nothing on your machine: the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
+
 ## Troubleshooting
 
 Run `cf-orbs doctor` first.
@@ -275,7 +279,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Status and known gaps
 
-v0.2.2. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
+v0.2.3. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
 
 Known gaps:
 

@@ -202,6 +202,28 @@ export function deployFailureError(kind: DeployFailure, output: string): CliErro
   }
 }
 
+export type WorkerLookup = { kind: "found" } | { kind: "missing" } | { kind: "unknown"; reason: string };
+
+/**
+ * Does a Worker with this name exist in the account? Runs `wrangler deployments list --json --name <name>`.
+ * Verified with wrangler 4.156.0: an existing Worker exits 0 and prints a JSON array. A missing one exits 1,
+ * prints nothing on stdout and prints `This Worker does not exist on your account. [code: 10007]` on stderr.
+ * Any other result (auth, network, bad account id, odd output) is "unknown".
+ */
+export async function lookupWorker(w: Wrangler, name: string): Promise<WorkerLookup> {
+  const r = await w.run(["deployments", "list", "--json", "--name", name], { timeoutMs: 60_000 });
+  const out = `${r.stdout}\n${r.stderr}`;
+  if (r.code === 0) {
+    try {
+      if (Array.isArray(JSON.parse(r.stdout.slice(Math.max(0, r.stdout.indexOf("["))))))
+        return { kind: "found" };
+    } catch {}
+    return { kind: "unknown", reason: "unreadable wrangler output" };
+  }
+  if (/\[code: 10007\]|This Worker does not exist/.test(out)) return { kind: "missing" };
+  return { kind: "unknown", reason: lastErrorLine(out) };
+}
+
 /** Last meaningful line of wrangler output, preferring the "✘ [ERROR]" line. */
 export function lastErrorLine(output: string): string {
   const clean = output.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), "");

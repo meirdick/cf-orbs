@@ -387,6 +387,11 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
       warm?: "ok" | "fail";
       /** wrangler containers list: ok (default), paid (plan error), other (unknown error) */
       containers?: "ok" | "paid" | "other";
+      /**
+       * wrangler deployments list --name: missing (default until a deploy ran, then found), found,
+       * or error (wrangler fails with a network error)
+       */
+      worker?: "missing" | "found" | "error";
       /** GET /v1/warm after init starts prewarm: ok (default), failed (no instance ready), pending (never done) */
       selftest?: "ok" | "failed" | "pending";
       /** /v1/provider/restart body; {status, error} answers with that HTTP error */
@@ -399,7 +404,9 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     const cfApi: string[] = [];
     const secretDeletes: string[] = [];
     const secretPaths: string[] = [];
-    const run: Runner = async (cmd, args) => {
+    const wranglerCalls: string[] = [];
+    let workerDeployed = false;
+    const run: Runner = async (cmd, args, ro) => {
       if (cmd === "docker") return { code: 0, stdout: "27.0.0", stderr: "" };
       if (args.includes("whoami"))
         return {
@@ -417,7 +424,9 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
         if (extra.containers === "other") return { code: 1, stdout: "", stderr: "network unreachable" };
         return { code: 0, stdout: "[]", stderr: "" };
       }
+      if (cmd !== "docker") wranglerCalls.push(`${ro?.env?.CLOUDFLARE_ACCOUNT_ID} ${args.join(" ")}`);
       if (args.includes("deploy")) {
+        workerDeployed = true;
         const f = args[args.indexOf("--secrets-file") + 1] as string;
         secretPaths.push(f);
         deploySecrets.push(JSON.parse(readFileSync(f, "utf8")));
@@ -444,8 +453,18 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
         secretDeletes.push(args.join(" "));
         return { code: 0, stdout: "Success", stderr: "" };
       }
-      if (args.includes("deployments"))
+      if (args.includes("deployments")) {
+        const w = extra.worker ?? (workerDeployed ? "found" : "missing");
+        if (w === "missing")
+          return {
+            code: 1,
+            stdout: "",
+            stderr:
+              "\u001b[31m✘ [ERROR]\u001b[0m A request to the Cloudflare API (/accounts/acct1/workers/scripts/cf-orbs/deployments) failed.\n\n  This Worker does not exist on your account. [code: 10007]\n",
+          };
+        if (w === "error") return { code: 1, stdout: "", stderr: "fetch failed: network unreachable" };
         return { code: 0, stdout: '[{"created_on":"2026-10-30T20:00:00Z"}]', stderr: "" };
+      }
       return { code: 1, stdout: "", stderr: `unexpected ${cmd} ${args.join(" ")}` };
     };
     let statusCalls = 0;
@@ -534,6 +553,9 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
         "non-interactive": { type: "boolean" },
         "provider-name": { type: "string" },
         vcpu: { type: "string" },
+        adopt: { type: "boolean" },
+        name: { type: "string" },
+        "no-deploy": { type: "boolean" },
       }),
       dir,
       {
@@ -547,7 +569,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
         templates,
       },
     );
-    return { ctx, cap, deploySecrets, secretPaths, calls, secretDeletes, cfApi };
+    return { ctx, cap, deploySecrets, secretPaths, calls, secretDeletes, cfApi, wranglerCalls };
   }
 
   it("plan check: a Containers plan error stops init before scaffold and deploy", async () => {
@@ -1063,7 +1085,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     const first = setup(["--non-interactive"], { AMP_ORB_PROVIDER_TOKEN: "aop_live_x1234567" }, 1);
     const o = initOptions(first.ctx);
     await runInit(first.ctx, o, plan(o, { ...(await gatherProbes(first.ctx)), tty: false }));
-    const d = setup([], {}, 1);
+    const d = setup([], {}, 1, true, { worker: "found" });
     const checks = await runDoctor(d.ctx);
     expect(checks.map((c) => `${c.status} ${c.name}`)).toEqual([
       "PASS config",
@@ -1080,5 +1102,106 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
       "INFO Amp snapshot cache",
     ]);
     expect(d.calls.some((c) => c.startsWith("POST"))).toBe(false);
+  });
+
+  // --- adopt guard ---
+  const ENV = { AMP_ORB_PROVIDER_TOKEN: "aop_live_testtoken123" };
+  const STOP =
+    "Failed: Worker cf-orbs already exists in this account and this folder did not create it — fix: run init in the folder that made it, restore that folder (see Back up and restore), pass --name <new> for a second install, or pass --adopt to take it over";
+  const ADOPT =
+    "adopt: taking over Worker cf-orbs; a new control token replaces the old one (the folder that made it loses CLI access); this folder's config and image/ are deployed";
+
+  function make(argv: string[], extra: Parameters<typeof setup>[4] = {}) {
+    return setup(argv, ENV, 2, true, extra);
+  }
+  async function go(s: ReturnType<typeof make>) {
+    const o = initOptions(s.ctx);
+    const probes = { ...(await gatherProbes(s.ctx, o)), tty: false };
+    return runInit(s.ctx, o, plan(o, probes));
+  }
+  const lookups = (s: ReturnType<typeof make>) =>
+    s.wranglerCalls.filter((c) => c.includes(" deployments list "));
+
+  it("new folder, Worker not found: checks with --json --name, then deploys as before", async () => {
+    const s = make(["--non-interactive"]);
+    await go(s);
+    expect(lookups(s)).toHaveLength(1);
+    expect(lookups(s)[0]).toMatch(/^acct1 .* deployments list --json --name cf-orbs$/);
+    expect(s.deploySecrets).toHaveLength(1);
+    expect(s.cap.lines.join("\n")).not.toMatch(/adopt|existing-Worker/);
+  });
+
+  it("new folder, Worker found: stops with one line before any deploy, secret or token write", async () => {
+    const s = make(["--non-interactive"], { worker: "found" });
+    await expect(go(s)).rejects.toThrow(STOP);
+    expect(s.deploySecrets).toHaveLength(0);
+    expect(s.secretDeletes).toEqual([]);
+    expect(s.calls).toEqual([]);
+    expect(existsSync(s.ctx.paths.controlToken)).toBe(false);
+    expect((await readState(s.ctx.paths)).url).toBeUndefined();
+  });
+
+  it("the check uses the account id and the --name Worker name", async () => {
+    const s = make(["--non-interactive", "--name", "second"], { worker: "found" });
+    await expect(go(s)).rejects.toThrow(/^Failed: Worker second already exists/);
+    expect(lookups(s)).toHaveLength(1);
+    expect(lookups(s)[0]).toMatch(/^acct1 .* deployments list --json --name second$/);
+  });
+
+  it("new folder, found, --adopt: one warning, then deploys with a new control token", async () => {
+    const s = make(["--non-interactive", "--adopt"], { worker: "found" });
+    await go(s);
+    expect(s.cap.lines.filter((l) => l.startsWith("adopt:"))).toEqual([ADOPT]);
+    expect(s.deploySecrets).toHaveLength(1);
+    expect(s.deploySecrets[0]?.CONTROL_TOKEN).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("--adopt with no existing Worker: no warning, deploys", async () => {
+    const s = make(["--non-interactive", "--adopt"]);
+    await go(s);
+    expect(s.cap.lines.join("\n")).not.toContain("adopt:");
+    expect(s.deploySecrets).toHaveLength(1);
+  });
+
+  it("check fails for another reason: one warning and init goes on", async () => {
+    const s = make(["--non-interactive"], { worker: "error" });
+    await go(s);
+    const w = s.cap.lines.filter((l) => l.startsWith("existing-Worker check could not run"));
+    expect(w).toHaveLength(1);
+    expect(w[0]).toContain("network unreachable");
+    expect(s.deploySecrets).toHaveLength(1);
+  });
+
+  it("same folder re-run: no check, no stop", async () => {
+    const first = make(["--non-interactive"]);
+    await go(first);
+    // the Worker exists now, but this folder made it (state.json has the URL)
+    const again = make(["--non-interactive"], { worker: "found" });
+    await go(again);
+    expect(lookups(again)).toEqual([]);
+    expect(again.deploySecrets).toHaveLength(1);
+  });
+
+  it("external mode: found stops, --adopt goes on", async () => {
+    const s = make(["--non-interactive", "--provider", "external"], { worker: "found" });
+    await expect(go(s)).rejects.toThrow(STOP);
+    expect(s.deploySecrets).toHaveLength(0);
+    const a = make(["--non-interactive", "--provider", "external", "--adopt"], { worker: "found" });
+    await go(a);
+    expect(a.deploySecrets).toHaveLength(1);
+  });
+
+  it("the plan has the step only for a folder with no saved deployment, between scaffold and control-token", async () => {
+    const s = make(["--non-interactive", "--adopt"]);
+    const o = initOptions(s.ctx);
+    const base = { ...(await gatherProbes(s.ctx, o)), tty: false };
+    const kinds = plan(o, base).map((x) => x.kind);
+    expect(kinds.slice(1, 5)).toEqual(["plan-check", "scaffold", "adopt-check", "control-token"]);
+    expect(plan(o, base).find((x) => x.kind === "adopt-check")).toEqual({ kind: "adopt-check", adopt: true });
+    const saved = plan(o, { ...base, deployed: true, prevMode: "cloudflare", hasControlToken: true });
+    expect(saved.map((x) => x.kind)).not.toContain("adopt-check");
+    // a folder with a control token but no saved URL (a run that failed after the deploy, or a restored backup)
+    const tokenOnly = plan(o, { ...base, deployed: false, hasControlToken: true });
+    expect(tokenOnly.map((x) => x.kind)).not.toContain("adopt-check");
   });
 });

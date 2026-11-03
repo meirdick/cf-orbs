@@ -120,6 +120,7 @@ Before the deploy, `init` stops with one `Failed: … — fix: …` line when:
 - An extra image key has no `image/<key>.Dockerfile`.
 - The account has no workers.dev subdomain and you gave no `--subdomain` (in a terminal, `init` asks for one).
 - `wrangler containers list` fails with a clear plan or login error (Workers Paid is needed). Any other error is a warning.
+- The folder has no saved deployment and a Worker of the same name already exists in the account. `init` stops before it makes a control token, sets a secret or deploys, so it cannot overwrite a Worker that another folder made. Pass `--adopt` to take it over: a new control token replaces the old one, and this folder's config and `image/` are deployed. A rerun in the folder that made the Worker is not checked. If the check cannot run, it is a warning.
 
 After the deploy, `init` checks that `/v1/health` answers, that `/v1/status` accepts the control token, that at least one prewarm instance starts from the new image (self-test; skipped when `prewarm` is 0, and with `--no-deploy` until a build has run), and that the provider runs for 15 s with no token rejection and no second provider on the token.
 
@@ -184,7 +185,7 @@ Example: 120 awake hours a month at 20% CPU costs about $27.50 a month in total 
 
 | Command | Does |
 | --- | --- |
-| `cf-orbs init [dir]` | Scaffold, deploy and check a provider. Flags: `--provider cloudflare\|external`, `--token-file`, `--account-id`, `--provider-name`, `--subdomain`, `--vcpu <1\|2\|3\|4>`, `--name <worker>`, `--no-deploy` (preview: [Workers Builds](docs/install-workers-builds.md), no Docker) |
+| `cf-orbs init [dir]` | Scaffold, deploy and check a provider. Flags: `--provider cloudflare\|external`, `--token-file`, `--account-id`, `--provider-name`, `--subdomain`, `--vcpu <1\|2\|3\|4>`, `--name <worker>`, `--no-deploy` (preview: [Workers Builds](docs/install-workers-builds.md), no Docker), `--adopt` (take over an existing Worker of the same name; see Back up) |
 | `cf-orbs status [orb]` | Install status (provider, awake orbs, snapshots), or one orb |
 | `cf-orbs logs <orb>` | Redacted bootstrap log of one orb. `--lines N` (default 200) |
 | `cf-orbs logs --provider` | Redacted provider log (last 20 lines) |
@@ -227,7 +228,7 @@ After `cf-orbs deploy`, an orb that is awake keeps the old Worker code until it 
 
 ### Back up
 
-Running orbs need nothing on your machine: the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
+Running orbs need nothing on your machine: the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. To restore in a new folder, run `init --adopt`: without it, `init` stops because the Worker already exists. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
 
 ## Troubleshooting
 
@@ -279,7 +280,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Status and known gaps
 
-v0.2.3. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
+v0.2.4. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
 
 Known gaps:
 

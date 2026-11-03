@@ -43,6 +43,7 @@ import {
   classifyDeployFailure,
   deployFailureError,
   lastErrorLine,
+  lookupWorker,
   makeWrangler,
   type WhoAmI,
   WRANGLER_PIN,
@@ -67,6 +68,8 @@ export interface InitOptions {
   name?: string;
   /** --no-deploy: git mode. No Docker, no deploy; Workers Builds deploys from a repo. */
   noDeploy?: boolean;
+  /** --adopt: take over an existing Worker of the same name that this folder did not create. */
+  adopt?: boolean;
 }
 
 export interface InitProbes {
@@ -92,6 +95,7 @@ export type InitStep =
   | { kind: "subdomain" }
   | { kind: "plan-check" }
   | { kind: "scaffold"; mode: ProviderHostMode; git: boolean }
+  | { kind: "adopt-check"; adopt: boolean }
   | { kind: "control-token"; action: "generate" | "reuse" }
   | { kind: "amp-token"; source: "env" | "file" | "prompt" | "keep" }
   | { kind: "deploy"; secrets: string[] }
@@ -242,6 +246,11 @@ export function plan(o: InitOptions, p: InitProbes): InitStep[] {
     { kind: "plan-check" },
     { kind: "scaffold", mode: o.mode, git: Boolean(o.noDeploy) },
   ];
+  // A folder with no saved deployment and no control token must not overwrite a Worker it did not create.
+  // A folder with a control token made the Worker before (a run that failed before it saved the URL) or holds a
+  // restored backup: it keeps the same token, so nothing is lost. Runs after scaffold (the Worker name is in the
+  // config then) and before the control token, the secrets and the deploy.
+  if (!p.deployed && !p.hasControlToken) steps.push({ kind: "adopt-check", adopt: Boolean(o.adopt) });
   steps.push({ kind: "control-token", action: p.hasControlToken ? "reuse" : "generate" });
   if (ampSource) steps.push({ kind: "amp-token", source: ampSource });
   if (o.noDeploy) {
@@ -467,6 +476,22 @@ export async function runInit(ctx: Ctx, o: InitOptions, steps: InitStep[]): Prom
           workerName: config.name,
         };
         await writeState(paths, state);
+        break;
+      }
+      case "adopt-check": {
+        if (!config) throw new Error("init plan bug: adopt-check before scaffold");
+        const found = await lookupWorker(makeWrangler(ctx.run, { accountId }), config.name);
+        if (found.kind === "found") {
+          if (!s.adopt)
+            throw new CliError(
+              `Worker ${config.name} already exists in this account and this folder did not create it`,
+              "run init in the folder that made it, restore that folder (see Back up and restore), pass --name <new> for a second install, or pass --adopt to take it over",
+            );
+          ui.warn(
+            `adopt: taking over Worker ${config.name}; a new control token replaces the old one (the folder that made it loses CLI access); this folder's config and image/ are deployed`,
+          );
+        } else if (found.kind === "unknown")
+          ui.warn(`existing-Worker check could not run (${found.reason}); init goes on`);
         break;
       }
       case "control-token":
@@ -965,6 +990,7 @@ export function initOptions(
     vcpu: parseVcpuFlag(flagString(ctx.args, "vcpu")),
     name,
     noDeploy: flagBool(ctx.args, "no-deploy"),
+    adopt: flagBool(ctx.args, "adopt"),
     mode: (modeFlag as ProviderHostMode | undefined) ?? existing?.providerHost ?? "cloudflare",
     nonInteractive: flagBool(ctx.args, "non-interactive") || Boolean(ctx.env.CI),
     tokenFile: flagString(ctx.args, "token-file"),

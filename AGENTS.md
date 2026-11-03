@@ -99,5 +99,6 @@ The first spawn on a new host starts from the image (about 45 s), then Amp sets 
 
 - Do not set `"debugExec": true` unless the user asks for the substrate benchmark. It lets the control token run commands in orbs.
 - Do not run `npx cf-orbs uninstall --yes` without the user's go-ahead. Without `--yes` it only lists what it would delete.
+- Do not pass `--adopt` without the user's go-ahead. In a new folder, `init` stops when a Worker of the same name exists. `--adopt` replaces that Worker's control token, config and image. Ask the user first. Use `--name <new>` for a second install.
 - Do not start a second `amp orb provider` on the same token.
 - Do not edit `.cf-orbs/wrangler.jsonc`. `deploy` writes it again.

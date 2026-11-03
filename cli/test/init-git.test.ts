@@ -37,7 +37,12 @@ beforeEach(async () => {
   await fakeTemplates(templates);
 });
 
-function setup(argv: string[], env: Record<string, string> = {}, warm?: unknown) {
+function setup(
+  argv: string[],
+  env: Record<string, string> = {},
+  warm?: unknown,
+  worker: "missing" | "found" = "missing",
+) {
   const calls: string[] = [];
   const bulk: Record<string, string>[] = [];
   const bulkFiles: string[] = [];
@@ -73,6 +78,14 @@ function setup(argv: string[], env: Record<string, string> = {}, warm?: unknown)
         stderr: "",
       };
     }
+    if (args.includes("deployments") && args.includes("list"))
+      return worker === "found"
+        ? { code: 0, stdout: '[{"created_on":"2026-10-30T20:00:00Z"}]', stderr: "" }
+        : {
+            code: 1,
+            stdout: "",
+            stderr: "✘ [ERROR] This Worker does not exist on your account. [code: 10007]",
+          };
     if (args.includes("containers") && args.includes("list")) return { code: 0, stdout: "[]", stderr: "" };
     if (args.includes("deploy") && args.includes("--secrets-file"))
       return { code: 0, stdout: "Uploaded\n  https://cf-orbs-wb2.me.workers.dev\n", stderr: "" };
@@ -101,6 +114,7 @@ function setup(argv: string[], env: Record<string, string> = {}, warm?: unknown)
     parseArgs(argv, {
       "non-interactive": { type: "boolean" },
       "no-deploy": { type: "boolean" },
+      adopt: { type: "boolean" },
       "token-file": { type: "string" },
       "provider-name": { type: "string" },
       provider: { type: "string" },
@@ -271,6 +285,37 @@ describe("init --no-deploy (git mode)", () => {
     expect((await gitRun("git", ["-C", dir, "rev-list", "--count", "HEAD"])).stdout.trim()).toBe("1");
   });
 
+  it("existing Worker of the same name: stops before any secret or token write; --adopt warns and goes on", async () => {
+    const stop = setup(
+      ["--no-deploy", "--non-interactive"],
+      { AMP_ORB_PROVIDER_TOKEN: TOKEN },
+      undefined,
+      "found",
+    );
+    await expect(init(stop)).rejects.toThrow(
+      "Failed: Worker cf-orbs already exists in this account and this folder did not create it — fix: run init in the folder that made it, restore that folder (see Back up and restore), pass --name <new> for a second install, or pass --adopt to take it over",
+    );
+    expect(stop.bulk).toHaveLength(0);
+    expect(existsSync(stop.ctx.paths.controlToken)).toBe(false);
+
+    const go = setup(
+      ["--no-deploy", "--non-interactive", "--adopt"],
+      { AMP_ORB_PROVIDER_TOKEN: TOKEN },
+      undefined,
+      "found",
+    );
+    await init(go);
+    expect(go.lines.filter((l) => l.startsWith("adopt:"))).toEqual([
+      "adopt: taking over Worker cf-orbs; a new control token replaces the old one (the folder that made it loses CLI access); this folder's config and image/ are deployed",
+    ]);
+    expect(go.bulk).toHaveLength(1);
+
+    // this folder made it now (state.json has the URL): a re-run does not check
+    const again = setup(["--no-deploy", "--non-interactive"], {}, undefined, "found");
+    await init(again);
+    expect(again.calls.some((c) => c.includes("deployments list"))).toBe(false);
+  });
+
   it("plan: no Docker needed; --provider external is rejected", async () => {
     const s = setup(["--no-deploy", "--non-interactive"]);
     const o = initOptions(s.ctx);
@@ -279,6 +324,7 @@ describe("init --no-deploy (git mode)", () => {
       "use-account",
       "plan-check",
       "scaffold",
+      "adopt-check",
       "control-token",
       "subdomain",
       "git-files",

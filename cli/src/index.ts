@@ -49,6 +49,8 @@ export const COMMANDS: Record<string, Command> = {
       "--name <name>                    Worker name (default cf-orbs; a second install needs another)",
       "--no-deploy                      preview: no Docker, no deploy. Make a git repo for Workers Builds,",
       "                                 create the Worker and its secrets, print the dashboard steps",
+      "--adopt                          take over a Worker of the same name that this folder did not create;",
+      "                                 init stops without it. A new control token replaces the old one",
     ],
     flags: {
       provider: { type: "string" },
@@ -59,6 +61,7 @@ export const COMMANDS: Record<string, Command> = {
       vcpu: { type: "string" },
       name: { type: "string" },
       "no-deploy": { type: "boolean" },
+      adopt: { type: "boolean" },
     },
     dirPositional: true,
     run: initCommand,

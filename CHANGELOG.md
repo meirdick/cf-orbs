@@ -4,6 +4,16 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-03
+
+### Added
+
+- `init --adopt`: take over a Worker of the same name that this folder did not create. A new control token replaces the old one, and this folder's config and `image/` are deployed. `init` prints one warning.
+
+### Fixed
+
+- `init` in a folder with no saved deployment and no control token now stops when a Worker of the same name already exists in the account. Before, it deployed over that Worker: new control token, default config and image, old image keys dropped. The check runs `wrangler deployments list --json --name <name>` before any token, secret or deploy, in every mode. If the check cannot run, `init` warns and goes on. A rerun in the same folder is not checked. Neither is a folder that has `.cf-orbs/control-token` (a run that failed before it saved the URL, or a restored backup): it keeps the same token. Restoring on a new machine without the control token needs `--adopt`.
+
 ## [0.2.3] - 2026-11-03
 
 ### Changed
@@ -148,7 +158,8 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/meirdick/cf-orbs/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/meirdick/cf-orbs/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/meirdick/cf-orbs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/meirdick/cf-orbs/compare/v0.2.0...v0.2.1

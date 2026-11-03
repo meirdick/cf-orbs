@@ -70,7 +70,7 @@ What `init` does:
 amp -ox "hello from cf-orbs" --orb-provider <name>
 ```
 
-The name after `--orb-provider` must match the provider name in Amp Settings. The default name is `cloudflare`. A saved name from an earlier `init` wins, so installs from before 0.2.3 keep `cf-orbs`. In the Amp app, pick the provider under **Self-Hosted** when you start a thread.
+The name after `--orb-provider` must match the provider name in Amp Settings. The default name is `cloudflare`. A saved name from an earlier `init` wins. In the Amp app, pick the provider under **Self-Hosted** when you start a thread.
 
 `init` is safe to run again. It keeps the control token, and it keeps the Amp token secret unless you give a new one.
 

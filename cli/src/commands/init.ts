@@ -936,7 +936,7 @@ export function parseVcpuFlag(v: string | undefined): number | undefined {
   return Number(v);
 }
 
-/** Default Amp provider name when none is given. Installs from before 0.2.3 keep their saved name (often cf-orbs). The Worker name default is separate: cf-orbs. */
+/** Default Amp provider name when none is given. The Worker name default is separate: cf-orbs. */
 export const DEFAULT_PROVIDER_NAME = "cloudflare";
 const WORKER_NAME_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 

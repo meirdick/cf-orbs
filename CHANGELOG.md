@@ -8,7 +8,7 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ### Changed
 
-- The default Amp provider name is `cloudflare`, not `cf-orbs`. The order is `--provider-name`, `AMP_ORB_PROVIDER_NAME`, the saved name, then `cloudflare`. Installs from before 0.2.3 keep their saved name, often `cf-orbs`. A second install with its own Worker name no longer takes that name as its provider name: pass `--provider-name`. The Worker name default is still `cf-orbs`.
+- The default Amp provider name is `cloudflare`, not `cf-orbs`. The order is `--provider-name`, `AMP_ORB_PROVIDER_NAME`, the saved name, then `cloudflare`. A second install with its own Worker name no longer takes that name as its provider name: pass `--provider-name`. The Worker name default is still `cf-orbs`.
 
 ### Added
 

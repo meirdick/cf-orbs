@@ -4,8 +4,8 @@
 import { readFile } from "node:fs/promises";
 import { CliError } from "./errors.js";
 
-export type InstanceSpec =
-  | "lite"
+/** An orb size. Copy of worker OrbInstanceSpec: "lite" is the provider's size only. */
+export type OrbInstanceSpec =
   | "standard-1"
   | "standard-2"
   | "standard-3"
@@ -14,7 +14,7 @@ export type InstanceSpec =
 
 /** Copy of worker/src/core/types.ts ProviderConfig. */
 export interface ProviderConfig {
-  instance: InstanceSpec;
+  instance: OrbInstanceSpec;
   maxRunning: number;
   maxAwakeHours: number;
   checkpointMinutes: number;
@@ -318,9 +318,9 @@ function num(v: unknown, name: string, min: number, max: number, integer = true)
 }
 
 /** Cloudflare custom instance rules: 1-4 vCPU, ≤ 12 GiB, ≤ 20 GB disk, ≥ 3 GiB per vCPU. Orbs need standard-1 or more. */
-export function validateInstance(v: unknown): InstanceSpec {
+export function validateInstance(v: unknown): OrbInstanceSpec {
   if (typeof v === "string") {
-    if (["standard-1", "standard-2", "standard-3", "standard-4"].includes(v)) return v as InstanceSpec;
+    if (["standard-1", "standard-2", "standard-3", "standard-4"].includes(v)) return v as OrbInstanceSpec;
     if (v === "lite" || v === "basic" || v === "dev") {
       fail(
         `instance ${v} is too small for the orb image`,
@@ -344,13 +344,13 @@ export function validateInstance(v: unknown): InstanceSpec {
 }
 
 /** Memory of an instance in MiB. Same as worker instanceMemoryMib. */
-export function instanceMemoryMib(i: InstanceSpec): number {
+export function instanceMemoryMib(i: OrbInstanceSpec): number {
   if (typeof i === "object") return i.memoryMib;
-  return { lite: 256, "standard-1": 4096, "standard-2": 6144, "standard-3": 8192, "standard-4": 12288 }[i];
+  return { "standard-1": 4096, "standard-2": 6144, "standard-3": 8192, "standard-4": 12288 }[i];
 }
 
 /** fastTmpfsGb: 0-8, and at most the orb memory minus 3 GiB. Same rule as worker validateFastTmpfs. */
-export function validateFastTmpfs(v: unknown, instance: InstanceSpec): number {
+export function validateFastTmpfs(v: unknown, instance: OrbInstanceSpec): number {
   const n = num(v, "fastTmpfsGb", 0, 8);
   const gib = Math.floor(instanceMemoryMib(instance) / 1024);
   const max = Math.max(0, gib - 3);

@@ -1,4 +1,4 @@
-# cf-orbs orb image (D4). Built by `cf-orbs deploy` (wrangler) and stored under the image key "orb".
+# cf-orbs orb image. Built by `cf-orbs deploy` (wrangler) and stored under the image key "orb".
 #
 # Why a digest pin and not :latest
 #   A snapshot only restores onto the image it was taken from. A moving tag gives a new image on the
@@ -10,7 +10,7 @@
 #   The base image has no init and its CMD (python3) exits at once. tini is PID 1, keeps the container
 #   up with `sleep infinity`, and reaps the processes that cf-orbs starts with setsid (amp orb bootstrap
 #   and its children). -s makes tini a subreaper, so orphans of those processes are reaped too.
-#   tini is pinned to one Debian version so that a rebuild without cache gives the same layer (R18).
+#   tini is pinned to one Debian version so that a rebuild without cache gives the same layer.
 #   If apt cannot find that version any more, bump it and treat the result as a new image.
 #
 # How to add toolchains

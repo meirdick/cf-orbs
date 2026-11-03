@@ -1,5 +1,5 @@
 #!/bin/sh
-# cf-orbs dispatch program. `amp orb provider` runs it once per job (D11, D12).
+# cf-orbs dispatch program. `amp orb provider` runs it once per job.
 #
 # Input (env, from Amp): ORB_OPERATION ORB_ID ORB_IMAGE ORB_SNAPSHOT_ID ORB_TOKEN AMP_URL
 # Input (env, from cf-orbs):
@@ -190,7 +190,7 @@ redact() { CFO_CTL=$CTL_TOKEN awk "$REDACT_AWK"; }
 say() { printf '%s\n' "$*" | redact; }
 
 # fail <message> [exit code]. One final line on stdout and stderr. Worker errors already start
-# with "Failed: "; drop it so the line has one prefix (D12).
+# with "Failed: "; drop it so the line has one prefix.
 fail() {
   msg=$1
   while :; do
@@ -223,7 +223,7 @@ case $OP in
   *) fail "unknown ORB_OPERATION '$(clean "$OP")' — fix: update cf-orbs (npx cf-orbs@latest deploy)" 2 ;;
 esac
 
-# Same rule as the server (D2): ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$
+# Same rule as the server: ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$
 orb_ok=1
 case $ORB in
   "" | [!A-Za-z0-9]* | *[!A-Za-z0-9_-]*) orb_ok=0 ;;

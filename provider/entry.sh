@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cf-orbs provider entry (D18). Runs `amp orb provider <dispatch>` in a loop.
+# cf-orbs provider entry. Runs `amp orb provider <dispatch>` in a loop.
 # Output is redacted, then written to stdout and to the log file. The log is capped.
 # Env:
 #   AMP_ORB_PROVIDER_TOKEN  required. Read by amp; never printed.

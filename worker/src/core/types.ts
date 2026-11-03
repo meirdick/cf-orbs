@@ -49,7 +49,7 @@ export interface SnapshotHandle {
   id: string; // Cloudflare snapshot id
   size: number; // bytes reported by snapshotContainer
   imageKey: string; // key in images map the snapshot was taken from
-  instance: InstanceSpec;
+  instance: OrbInstanceSpec;
   createdAt: string; // ISO
   lastRestoredAt?: string; // ISO; set on every successful restore. Expiry = max(createdAt, lastRestoredAt) + 30 d (D7)
   name?: string;
@@ -70,6 +70,7 @@ export interface SpawnEntry {
 /** OrbRecord.spawns keeps this many entries, oldest first. */
 export const SPAWN_HISTORY = 10;
 
+/** Any Cloudflare Containers instance size. "lite" (256 MiB) is used only by the provider container. */
 export type InstanceSpec =
   | "lite"
   | "standard-1"
@@ -78,6 +79,9 @@ export type InstanceSpec =
   | "standard-4"
   | { vcpu: number; memoryMib: number; diskMb: number };
 
+/** An orb size. "lite" is too small for the orb image, so config validation rejects it. */
+export type OrbInstanceSpec = Exclude<InstanceSpec, "lite">;
+
 /** Per-orb record in OrbSession storage under key "orb". */
 export interface OrbRecord {
   /** Schema version (D13). Old and new Worker code share storage; a missing v reads as 1. */
@@ -85,7 +89,7 @@ export interface OrbRecord {
   orbId: string;
   state: OrbState;
   imageKey: string;
-  instance: InstanceSpec;
+  instance: OrbInstanceSpec;
   handle?: SnapshotHandle; // per-orb snapshot (last pause or checkpoint)
   bootstrapTokenSha?: string; // first 16 hex of sha256(ORB_TOKEN) for the running bootstrap
   awakeSince?: string;
@@ -136,7 +140,7 @@ export type ProjectSnapshotRefresh = "off" | "on-change";
 
 /** Provider-level configuration, derived from cf-orbs.config.jsonc and passed as Worker vars (JSON string in CF_ORBS_CONFIG). */
 export interface ProviderConfig {
-  instance: InstanceSpec; // default { vcpu: 4, memoryMib: 12288, diskMb: 20000 }
+  instance: OrbInstanceSpec; // default { vcpu: 4, memoryMib: 12288, diskMb: 20000 }
   maxRunning: number; // default 20
   maxAwakeHours: number; // default 12
   checkpointMinutes: number; // default 0 = off

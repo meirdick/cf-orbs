@@ -5,6 +5,7 @@ import {
   DEFAULT_CONFIG,
   type InstanceSpec,
   MAX_PREWARM,
+  type OrbInstanceSpec,
   type ProjectSnapshotRefresh,
   type ProviderConfig,
 } from "./types";
@@ -37,9 +38,9 @@ function num(v: unknown, name: string, min: number, max: number, integer = true)
   return v;
 }
 
-export function validateInstance(v: unknown): InstanceSpec {
+export function validateInstance(v: unknown): OrbInstanceSpec {
   if (typeof v === "string") {
-    if ((NAMED as readonly string[]).includes(v)) return v as InstanceSpec;
+    if ((NAMED as readonly string[]).includes(v)) return v as OrbInstanceSpec;
     if (v === "lite" || v === "basic" || v === "dev") {
       fail(
         `instance ${v} is too small for the orb image`,

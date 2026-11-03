@@ -4,6 +4,20 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-03
+
+### Changed
+
+- The `init` token prompt names the Amp page where you create the token: Amp Settings → Orbs → Add Provider.
+- `init` warns when the provider name is not given explicitly, that is, when it comes from the config `name` or the default `cf-orbs`. The name must match the one in Amp. A name from `--provider-name`, `AMP_ORB_PROVIDER_NAME` or a previous run gives no warning.
+- `init --help` lists the full provider-name fallback order.
+- The comments in `image/Dockerfile`, `provider/Dockerfile`, `provider/entry.sh` and `dispatch/dispatch.sh` no longer contain internal requirement codes. `init` copies these files into your project.
+
+### Docs
+
+- `cf-orbs.config.example.jsonc` lists `debugExec`, `inactivityTimeoutMinutes`, `alarmSeconds` and `ampImageDigest`.
+- README: `instance.vcpu` accepts fractions between 1 and 4. The README links the docs site.
+
 ## [0.2.1] - 2026-11-02
 
 ### Fixed
@@ -123,7 +137,8 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/meirdick/cf-orbs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/meirdick/cf-orbs/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/meirdick/cf-orbs/releases/tag/v0.2.0
 [0.1.1]: https://github.com/meirdick/cf-orbs/releases/tag/v0.1.1

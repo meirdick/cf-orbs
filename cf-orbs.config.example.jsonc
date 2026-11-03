@@ -5,7 +5,7 @@
   "name": "cf-orbs",
 
   // Orb size. One size per install: Amp sends no size to the provider.
-  // Custom: vcpu 1-4, memoryMib up to 12288 and at least 3072 per vCPU, diskMb 8000-20000.
+  // Custom: vcpu 1-4 (fractions allowed), memoryMib up to 12288 and at least 3072 per vCPU, diskMb 8000-20000.
   // Or a named type: "standard-1" .. "standard-4". "lite" and "basic" are too small for the orb image.
   // Default 4 vCPU, 12 GiB, 20 GB. `cf-orbs init --vcpu N` writes N vCPU, N x 3 GiB, 20 GB (--vcpu 2 is cheaper).
   "instance": { "vcpu": 4, "memoryMib": 12288, "diskMb": 20000 },
@@ -53,4 +53,18 @@
 
   // Enable wrangler containers ssh for orbs (debug only).
   "debugSsh": false
+
+  // Turn on the exec and bench routes. Only for the substrate benchmark: the control token can then run
+  // commands in orbs. true or false.
+  // "debugExec": false,
+
+  // Minutes an orb may sit idle before the container stops. 5-360.
+  // "inactivityTimeoutMinutes": 15,
+
+  // Seconds between watchdog checks of an orb. 10-3600, and shorter than inactivityTimeoutMinutes.
+  // "alarmSeconds": 60,
+
+  // Digest of the Amp orb image the "orb" image is built from. Used for log lines only.
+  // Must look like sha256:<64 hex digits>.
+  // "ampImageDigest": "sha256:378c5e2188f00960eca36dc806aa04e1cacd92c2341665bcdf4692326c462d6d"
 }

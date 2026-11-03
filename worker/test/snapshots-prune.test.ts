@@ -156,7 +156,7 @@ describe("selectPruneCandidates", () => {
   const now = Date.parse("2026-10-30T20:00:00Z");
   const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
   const entry = (id: string, orbId: string, msAgo: number) => ({
-    handle: { id, size: 1, imageKey: "orb", instance: "lite" as const, createdAt: iso(msAgo) },
+    handle: { id, size: 1, imageKey: "orb", instance: "standard-1" as const, createdAt: iso(msAgo) },
     orbId,
     createdAt: iso(msAgo),
   });

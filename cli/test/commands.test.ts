@@ -531,6 +531,7 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
       parseArgs(argv, {
         provider: { type: "string" },
         "non-interactive": { type: "boolean" },
+        "provider-name": { type: "string" },
         vcpu: { type: "string" },
       }),
       dir,
@@ -636,6 +637,10 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(cap.lines).toContain("plan: Containers are available on this account");
     expect(cap.lines).toContain("self-test: orb image starts (2 of 2 ready in 41 s and 39 s)");
     expect(cap.lines).toContain("prewarm: started 2 instances in the background; check cf-orbs status");
+    // no --provider-name: the name is the default, so init warns that it must match Amp
+    expect(cap.lines).toContain(
+      "provider name cf-orbs was not given explicitly; it must match the name in Amp Settings → Orbs (pass --provider-name <name> if it differs)",
+    );
     expect(calls.length).toBeGreaterThanOrEqual(6);
     const state = await readState(ctx.paths);
     expect(state).toMatchObject({
@@ -660,6 +665,18 @@ describe("init end to end (fake wrangler, docker and control plane)", () => {
     expect(p2.find((s) => s.kind === "amp-token")).toEqual({ kind: "amp-token", source: "keep" });
     await runInit(again.ctx, o2, p2);
     expect(again.deploySecrets[0]).toEqual({ CONTROL_TOKEN: deploySecrets[0]?.CONTROL_TOKEN });
+    // the name is saved from the first run: no warning on the re-run
+    expect(again.cap.lines).not.toContain("provider name cf-orbs was not given explicitly");
+  });
+
+  it("provider name given with --provider-name: no warning, used in the final command", async () => {
+    const { ctx, cap } = setup(["--non-interactive", "--provider-name", "my-orbs"], {
+      AMP_ORB_PROVIDER_TOKEN: "aop_live_x1234567",
+    });
+    const o = initOptions(ctx);
+    const r = await runInit(ctx, o, plan(o, { ...(await gatherProbes(ctx)), tty: false }));
+    expect(r.command).toContain("--orb-provider my-orbs");
+    expect(cap.lines).not.toContain("provider name my-orbs was not given explicitly");
   });
 
   it("cloudflare mode: Amp rejects the token → fails with the token fix, no success line", async () => {

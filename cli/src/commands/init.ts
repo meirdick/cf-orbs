@@ -11,9 +11,9 @@ import {
   type CfOrbsConfig,
   CONFIG_FILE,
   findTopLevelValue,
-  type InstanceSpec,
   instanceForVcpu,
   loadConfig,
+  type OrbInstanceSpec,
   type ProviderHostMode,
   setTopLevelJsonc,
 } from "../config.js";
@@ -57,6 +57,8 @@ export interface InitOptions {
   providerName: string;
   /** --provider-name, AMP_ORB_PROVIDER_NAME or a saved name was given (else interactive init asks) */
   providerNameExplicit?: boolean;
+  /** Where providerName came from: flag or env are explicit; config and default were not given */
+  providerNameSource: "flag" | "env" | "saved" | "config" | "default";
   /** --subdomain / CF_ORBS_SUBDOMAIN: workers.dev subdomain to register if the account has none */
   subdomain?: string;
   /** --vcpu 1-4: write instance {vcpu N, memoryMib N*3072, diskMb 20000}. Not given: keep the config (default 4). */
@@ -472,6 +474,14 @@ export async function runInit(ctx: Ctx, o: InitOptions, steps: InitStep[]): Prom
         } else ui.step("control token: reusing .cf-orbs/control-token");
         break;
       case "amp-token":
+        // No interactive name question here: say so if the name is a fallback, not given
+        if (
+          s.source !== "prompt" &&
+          (o.providerNameSource === "config" || o.providerNameSource === "default")
+        )
+          ui.warn(
+            `provider name ${providerName} was not given explicitly; it must match the name in Amp Settings → Orbs (pass --provider-name <name> if it differs)`,
+          );
         if (s.source === "env") ampToken = checkAmpToken(ctx, (ctx.env.AMP_ORB_PROVIDER_TOKEN ?? "").trim());
         else if (s.source === "file") {
           const f = o.tokenFile as string;
@@ -489,7 +499,9 @@ export async function runInit(ctx: Ctx, o: InitOptions, steps: InitStep[]): Prom
             : keep
               ? "; Enter keeps the current one"
               : "";
-          const t = await askHidden(`Amp provider token (aop_live_…, not shown)${enter}: `);
+          const t = await askHidden(
+            `Amp provider token (aop_live_…, not shown; create or copy it in Amp Settings → Orbs → Add Provider)${enter}: `,
+          );
           if (t === "" && o.noDeploy) ui.step("amp token: not given; set it later (see the steps below)");
           else if (t === "" && keep) ui.step("amp token: keeping the current Worker secret");
           else ampToken = checkAmpToken(ctx, t);
@@ -899,7 +911,7 @@ export function judgeProviderLog(
   return { kind: "ok", exits: lines.filter((l) => /amp orb provider exited with code/.test(l)).length };
 }
 
-function sameInstance(a: InstanceSpec, b: { vcpu: number; memoryMib: number; diskMb: number }): boolean {
+function sameInstance(a: OrbInstanceSpec, b: { vcpu: number; memoryMib: number; diskMb: number }): boolean {
   return typeof a === "object" && a.vcpu === b.vcpu && a.memoryMib === b.memoryMib && a.diskMb === b.diskMb;
 }
 
@@ -959,6 +971,16 @@ export function initOptions(
       existing?.providerName ??
       existing?.name ??
       "cf-orbs",
+    providerNameSource:
+      flagString(ctx.args, "provider-name") !== undefined
+        ? "flag"
+        : ctx.env.AMP_ORB_PROVIDER_NAME !== undefined
+          ? "env"
+          : existing?.providerName !== undefined
+            ? "saved"
+            : existing?.name !== undefined
+              ? "config"
+              : "default",
   };
 }
 

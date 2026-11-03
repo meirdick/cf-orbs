@@ -1,4 +1,4 @@
-# cf-orbs provider image (D18). Runs `amp orb provider /app/dispatch.sh` under tini.
+# cf-orbs provider image. Runs `amp orb provider /app/dispatch.sh` under tini.
 # Build context is the repo root (wrangler image entry: build_context ".."):
 #   docker build -f provider/Dockerfile -t cf-orbs-provider .
 FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c
@@ -6,7 +6,7 @@ FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc
 # Pinned Amp CLI. Bump with Renovate or by hand; the provider must match Amp's job protocol.
 ARG AMP_CLI_VERSION=0.0.1793390435-g08e9ec
 
-# curl: dispatch.sh (D12). tini: PID 1 that forwards signals and reaps children.
+# curl: dispatch.sh. tini: PID 1 that forwards signals and reaps children.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends curl ca-certificates tini \
   && rm -rf /var/lib/apt/lists/*

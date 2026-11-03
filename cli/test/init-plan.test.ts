@@ -15,6 +15,7 @@ const opts = (over: Partial<InitOptions> = {}): InitOptions => ({
   mode: "cloudflare",
   nonInteractive: false,
   providerName: "cf-orbs",
+  providerNameSource: "default",
   ...over,
 });
 const kinds = (s: InitStep[]) => s.map((x) => x.kind);

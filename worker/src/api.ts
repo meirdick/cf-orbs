@@ -18,7 +18,7 @@ import { type Env, orbDoName, PROVIDER_DO_NAME, REGISTRY_DO_NAME } from "./env";
 import { BENCH_ORB_RE, type BenchStartRequest, parseBenchStart } from "./orb/bench";
 import { restartProvider } from "./provider-restart";
 
-export const API_VERSION = "0.1.0";
+export const API_VERSION = "0.2.2";
 
 /** D2. Amp sends `amp-<thread id>`. Never starts with `_` or `.`, so it cannot look like an internal name. */
 export const ORB_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;

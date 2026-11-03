@@ -2,6 +2,8 @@
 
 Run [Amp](https://ampcode.com) orbs on your own Cloudflare account. cf-orbs is a self-hosted Amp orb provider built on Cloudflare Containers. You install it with one command.
 
+Docs: [cf-orbs-site.mdick85.workers.dev/docs](https://cf-orbs-site.mdick85.workers.dev/docs/)
+
 Community project. Not affiliated with Cloudflare or Amp (Sourcegraph). "Cloudflare" and "Amp" are trademarks of their owners.
 
 ## Why cf-orbs
@@ -50,7 +52,7 @@ mkdir my-orbs && cd my-orbs
 npx cf-orbs init --provider-name <name from Amp>
 ```
 
-`init` asks for the Amp provider token. It does not show what you type, and the token does not go into your shell history.
+`init` asks for the Amp provider token. The prompt names the Amp page where you create it. It does not show what you type, and the token does not go into your shell history.
 
 Measured on 2026-10-30 in an empty directory: **4 min 41 s** from `init` to a running provider. That includes the push of the 1.8 GB orb image (the whole deploy took 247 s). A slow uplink takes longer. The Cloudflare registry sometimes times out on a large push, or answers `Unauthorized` after image preparation. `init` retries both automatically, up to 3 times, and keeps the layers that it already pushed.
 
@@ -203,7 +205,7 @@ Every command takes `--json`, `--dir <project>` and `--non-interactive`. Orb ids
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `name` | `cf-orbs` | Worker name. A second install needs another name |
-| `instance` | `{vcpu: 4, memoryMib: 12288, diskMb: 20000}` | Orb size: custom (1-4 vCPU, at least 3 GiB per vCPU, up to 12 GiB, 8-20 GB disk) or `standard-1`..`standard-4`. `init --vcpu N` writes `{vcpu: N, memoryMib: N*3072, diskMb: 20000}` |
+| `instance` | `{vcpu: 4, memoryMib: 12288, diskMb: 20000}` | Orb size: custom (1-4 vCPU, fractions allowed, at least 3 GiB per vCPU, up to 12 GiB, 8-20 GB disk) or `standard-1`..`standard-4`. `init --vcpu N` writes `{vcpu: N, memoryMib: N*3072, diskMb: 20000}` |
 | `maxRunning` | 20 | Cap on awake orbs. The next spawn fails with a clear message |
 | `maxAwakeHours` | 12 | The watchdog pauses an orb that is awake longer than this |
 | `checkpointMinutes` | 0 (off) | Snapshot an awake orb with changes every N minutes (15 or more) |
@@ -273,7 +275,7 @@ To report a vulnerability, see [SECURITY.md](https://github.com/meirdick/cf-orbs
 
 ## Status and known gaps
 
-v0.2.1. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
+v0.2.2. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
 
 Known gaps:
 

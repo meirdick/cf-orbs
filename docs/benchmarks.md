@@ -53,7 +53,7 @@ Snapshot storage has no published rate (beta) and is not in these numbers. Rates
 
 ## Run the substrate bench
 
-It measures cold start from the image, restore at several sizes, pause, and parallel restores. It needs no Amp thread and starts only `bench-*` orbs that Amp never uses. It prints a cost estimate and asks first.
+It measures cold start from the image, restore at several sizes, pause, and parallel restores. It needs no Amp thread and starts only `bench-*` orbs, which Amp never uses. Before it starts, it prints a cost estimate and asks you.
 
 1. Set `"debugExec": true` in `cf-orbs.config.jsonc` and run `cf-orbs deploy`. This lets the control token run commands in orbs.
 2. In a clone of this repo (Node 22.18 or later):

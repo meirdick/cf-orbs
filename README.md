@@ -1,6 +1,6 @@
 # cf-orbs
 
-Run [Amp](https://ampcode.com) orbs on your own Cloudflare account. cf-orbs is a self-hosted Amp orb provider built on Cloudflare Containers. You install it with one command.
+Run [Amp](https://ampcode.com) orbs, the cloud machines where Amp's coding agent works, on your own Cloudflare account. cf-orbs is a self-hosted Amp orb provider built on Cloudflare Containers, and you install it with one command.
 
 Docs: [cf-orbs-site.mdick85.workers.dev/docs](https://cf-orbs-site.mdick85.workers.dev/docs/)
 
@@ -11,19 +11,19 @@ Community project. Not affiliated with Cloudflare or Amp (Sourcegraph). "Cloudfl
 Amp's self-hosted orbs work like this: you provide the compute, and Amp turns it into orbs. cf-orbs makes your Cloudflare account that compute. You keep the same Amp threads and the same orb experience, on machines you own.
 
 - **Your account.** Orbs, snapshots and logs stay in your Cloudflare account. The provider connects out to Amp. Nothing connects in.
-- **No server to run.** One CLI, no cluster, no extra API keys. Cloudflare runs the machines.
+- **No server to run.** You install with one CLI. There is no cluster and no extra API key, and Cloudflare runs the machines.
 - **Your image.** Orbs start from your own image and toolchain (`image/Dockerfile`).
 - **Your bill.** You pay Cloudflare. A paused orb has no compute charge.
-- **New threads start ready.** Repo setup runs once. Each new thread then starts from that project snapshot, with your dependencies already installed.
-- **Recovers by itself.** A lost orb comes back and the agent runs the failed tool call again. Paused orbs restore after an image rebuild.
+- **New threads start ready.** Repo setup runs once, and each new thread then starts from that project snapshot with your dependencies already installed.
+- **Recovers by itself.** A lost orb comes back, and the agent runs the failed tool call again. Paused orbs restore after an image rebuild.
 
 Benchmarked as fast or faster than Amp-hosted orbs on first response and installs ([benchmarks](https://cf-orbs-site.mdick85.workers.dev/benchmarks), [method](docs/benchmarks.md#method)).
 
-Good to know: a paused orb keeps its files, not running processes (Cloudflare saves the disk only). One orb is at most 4 vCPU, 12 GiB memory and 20 GB disk.
+Good to know: a paused orb keeps its files but not its running processes, because Cloudflare saves only the disk. One orb is at most 4 vCPU, 12 GiB memory and 20 GB disk.
 
 ## What it is
 
-An Amp orb is the machine where an Amp agent runs its tools: it clones your repo, runs commands and edits files. Amp runs orbs on its own servers by default. With a self-hosted provider, the orbs run on your infrastructure instead.
+An Amp orb is the machine where an Amp agent runs its tools: it clones your repo, runs commands and edits files there. By default Amp runs orbs on its own servers. With a self-hosted provider, they run on your infrastructure instead.
 
 cf-orbs makes each orb a Cloudflare Container: a microVM with its own kernel, network and disk, started from Amp's orb image. It has three parts, all in your Cloudflare account:
 
@@ -31,7 +31,7 @@ cf-orbs makes each orb a Cloudflare Container: a microVM with its own kernel, ne
 - **A provider container.** It runs `amp orb provider`, which takes orb jobs from Amp over an outbound connection.
 - **The orbs.** One container per Amp thread.
 
-When Amp pauses an orb, cf-orbs saves the disk as a snapshot and stops the container, so a paused orb has no compute charge. The next message restores the disk. Amp project snapshots work too: a new thread on a known repo starts from the disk that Amp already set up.
+When Amp pauses an orb, cf-orbs saves the disk as a snapshot and stops the container, so a paused orb has no compute charge. The next message restores the disk. Amp project snapshots work too, so a new thread on a known repo starts from the disk that Amp already set up.
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ When Amp pauses an orb, cf-orbs saves the disk as a snapshot and stops the conta
 | wrangler logged in to that account | `npx wrangler login`, then `npx wrangler whoami` |
 | An Amp provider token (`aop_live_…`) | Amp → Settings → Orbs → Add Provider. Note the provider name you type there |
 
-A personal provider needs no workspace admin. Make it in your personal Amp settings.
+You don't need to be a workspace admin for a personal provider. Make it in your personal Amp settings.
 
 ## Quick start
 
@@ -52,7 +52,7 @@ mkdir my-orbs && cd my-orbs
 npx cf-orbs init --provider-name <name from Amp>
 ```
 
-`init` asks for the Amp provider token. The prompt names the Amp page where you create it. It does not show what you type, and the token does not go into your shell history.
+`init` asks for the Amp provider token and names the Amp page where you create it. It doesn't show what you type, and the token doesn't go into your shell history.
 
 Measured on 2026-10-30 in an empty directory: **4 min 41 s** from `init` to a running provider. That includes the push of the 1.8 GB orb image (the whole deploy took 247 s). A slow uplink takes longer. The Cloudflare registry sometimes times out on a large push, or answers `Unauthorized` after image preparation. `init` retries both automatically, up to 3 times, and keeps the layers that it already pushed.
 
@@ -70,18 +70,18 @@ What `init` does:
 amp -ox "hello from cf-orbs" --orb-provider <name>
 ```
 
-The name after `--orb-provider` must match the provider name in Amp Settings. The default name is `cloudflare`. A saved name from an earlier `init` wins. In the Amp app, pick the provider under **Self-Hosted** when you start a thread.
+The name after `--orb-provider` must match the provider name in Amp Settings. The default name is `cloudflare`, but a saved name from an earlier `init` wins. In the Amp app, pick the provider under **Self-Hosted** when you start a thread.
 
-`init` is safe to run again. It keeps the control token, and it keeps the Amp token secret unless you give a new one.
+`init` is safe to run again. It keeps the control token, and it keeps the Amp token secret unless you give it a new one.
 
-Non-interactive (CI or an agent): put the token in a file with mode 600 and pass `--token-file`. In CI, `AMP_ORB_PROVIDER_TOKEN` from a secret store also works.
+To run `init` non-interactively (in CI or from an agent), put the token in a file with mode 600 and pass `--token-file`. In CI, `AMP_ORB_PROVIDER_TOKEN` from a secret store also works.
 
 ```sh
 npx cf-orbs init --non-interactive --token-file <file> --provider-name <name> --subdomain <name> \
   --account-id <id>   # only if wrangler sees more than one account
 ```
 
-Orb size: `init` writes 4 vCPU, 12 GiB, 20 GB disk. For a cheaper orb add `--vcpu 2` (2 vCPU, 6 GiB, about half the memory cost). `--vcpu <1|2|3|4>` writes N vCPU and N x 3 GiB. For any other size, edit `instance` in `cf-orbs.config.jsonc`.
+Orb size: `init` writes 4 vCPU, 12 GiB and 20 GB disk. For a cheaper orb, add `--vcpu 2` (2 vCPU, 6 GiB, about half the memory cost). `--vcpu <1|2|3|4>` writes N vCPU and N x 3 GiB. For any other size, edit `instance` in `cf-orbs.config.jsonc`.
 
 An AI agent that installs cf-orbs for you can follow [AGENTS.md](AGENTS.md).
 
@@ -100,13 +100,13 @@ Then use `node <repo>/cli/bin/cf-orbs.js` wherever this README says `cf-orbs`, w
 
 ### Install without Docker (Workers Builds, preview)
 
-No Docker on your machine? `init --no-deploy` makes a git repo and the Worker with its secrets, but does not deploy. You push the repo to GitHub or GitLab and connect it in the Cloudflare dashboard. Workers Builds then builds both images in your account and deploys on each push. Measured: first build 10.6 min, upgrade 5.6 min, plus 2-4 min in the queue.
+If you don't have Docker, `init --no-deploy` makes a git repo and the Worker with its secrets, but doesn't deploy. You push the repo to GitHub or GitLab and connect it in the Cloudflare dashboard. Workers Builds then builds both images in your account and deploys on each push. Measured: first build 10.6 min, upgrade 5.6 min, plus 2-4 min in the queue.
 
 ```sh
 npx cf-orbs init --no-deploy --provider-name <name from Amp> --token-file <file>
 ```
 
-It prints the dashboard settings to use. Full procedure and caveats: [docs/install-workers-builds.md](docs/install-workers-builds.md). This is a preview: the default install above (local Docker) and all defaults do not change.
+It prints the dashboard settings to use. The full procedure and caveats are in [docs/install-workers-builds.md](docs/install-workers-builds.md). This is a preview, and it doesn't change the default install above (local Docker) or any default.
 
 ### What init validates
 
@@ -141,7 +141,7 @@ After the deploy, `init` checks that `/v1/health` answers, that `/v1/status` acc
 
 ## Pause and resume
 
-Amp decides when an orb pauses: after the agent is idle and nobody interacts with the thread for about 20 minutes (we saw 20-25 min). An archived thread pauses too. A deleted thread deletes its orb.
+Amp decides when an orb pauses: after the agent is idle and nobody interacts with the thread for about 20 minutes (we saw 20-25 min). An archived thread pauses too, and a deleted thread deletes its orb.
 
 On pause, cf-orbs stops the Amp processes, takes a snapshot of the disk and stops the container. On the next message, Amp sends a spawn and cf-orbs restores the disk. Measured: spawn from a snapshot in 2.3 s (container ready in 0.6 s).
 
@@ -150,7 +150,7 @@ On pause, cf-orbs stops the Amp processes, takes a snapshot of the disk and stop
 | Files, the repo, installed packages, build caches (everything on the disk) | Running processes: dev servers, watchers, terminal sessions |
 | | Memory |
 
-Warm pause (`warmMinutes`, default 10): cf-orbs saves the disk at the pause but keeps the container and Amp's processes running for 10 more minutes. A message in that time reuses them: no restore, no restart. After that the orb stops. A warm orb counts toward `maxRunning` and is billed like an awake orb. `cf-orbs status` shows `warm` and the time left.
+Warm pause (`warmMinutes`, default 10): cf-orbs saves the disk at the pause but keeps the container and Amp's processes running for 10 more minutes. A message in that time reuses them, with no restore and no restart. After that the orb stops. A warm orb counts toward `maxRunning` and is billed like an awake orb. `cf-orbs status` shows `warm` and the time left.
 
 Amp runs `.agents/resume` on wake, and portal services restart when you open them. Amp-hosted orbs keep memory across a pause; cf-orbs does not.
 
@@ -201,7 +201,7 @@ Every command takes `--json`, `--dir <project>` and `--non-interactive`. Orb ids
 
 ## Configuration
 
-`cf-orbs.config.jsonc` in your project directory. Edit it, then run `cf-orbs deploy`. Do not edit `.cf-orbs/wrangler.jsonc`: deploy writes it again.
+The config is `cf-orbs.config.jsonc` in your project directory. Edit it, then run `cf-orbs deploy`. Do not edit `.cf-orbs/wrangler.jsonc`, because deploy writes it again.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
@@ -222,13 +222,13 @@ Every command takes `--json`, `--dir <project>` and `--non-interactive`. Orb ids
 
 To add toolchains to every orb, edit `image/Dockerfile` (see [image/README.md](image/README.md)). Repo setup for one project belongs in that repo's `.agents/setup`.
 
-After `cf-orbs deploy`, an orb that is awake keeps the old Worker code until it pauses (a Cloudflare behaviour). Config changes reach it at the same time.
+After `cf-orbs deploy`, an orb that is awake keeps the old Worker code until it pauses (a Cloudflare behaviour). Config changes reach it at that point too.
 
 `cf-orbs deploy` then starts `prewarm` throwaway instances in the background (`prewarm: started 2 instances in the background`); `cf-orbs status` shows how fast they were ready.
 
 ### Back up
 
-Running orbs need nothing on your machine: the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. To restore in a new folder, run `init --adopt`: without it, `init` stops because the Worker already exists. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
+Running orbs need nothing on your machine, because the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. To restore in a new folder, run `init --adopt`. Without it, `init` stops because the Worker already exists. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
 
 ## Troubleshooting
 
@@ -305,7 +305,7 @@ Method, results and costs: [docs/benchmarks.md](docs/benchmarks.md). The substra
 | [AGENTS.md](AGENTS.md) | Install guide for an AI agent at a terminal |
 | [Install without Docker](docs/install-workers-builds.md) | Preview: Workers Builds builds and deploys from a git repo |
 | [Provider host](provider/README.md) | Cloudflare-hosted vs external provider, token rotation |
-| [Orb image](image/README.md) | The pinned image, toolchains, why snapshots are tied to it |
+| [Orb image](image/README.md) | The pinned image, toolchains, how snapshots relate to it |
 | [Dispatch](dispatch/README.md) | The program Amp runs per job, and its protocol |
 | [Architecture](docs/architecture.md) | Parts, control flow, spawn and pause, billing |
 | [Benchmarks](docs/benchmarks.md) | Method, results, costs, how to run the substrate bench |

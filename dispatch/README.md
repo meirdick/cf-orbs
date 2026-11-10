@@ -4,9 +4,9 @@
 
 ## Use
 
-The CF-hosted provider (`provider/`) runs it as `/app/dispatch.sh`. You do not run it yourself.
+The CF-hosted provider (`provider/`) runs it as `/app/dispatch.sh`, so you do not run it yourself.
 
-External mode (the provider runs on your own host), from your project directory:
+In external mode (the provider runs on your own host), run this from your project directory:
 
 ```sh
 export AMP_ORB_PROVIDER_TOKEN=aop_live_...
@@ -30,9 +30,9 @@ amp orb provider .cf-orbs/dispatch/dispatch.sh
 | `CF_ORBS_CONTROL_TOKEN_FILE` | you | File with the bearer (first line). Used when `CF_ORBS_CONTROL_TOKEN` is unset. |
 | `CF_ORBS_DEADLINE_SECONDS` | tests | Give up after this many seconds, 1-3600. Default 270 (Amp's job limit is 300). |
 
-When the URL host is `control.internal`, no bearer is sent: the Worker intercepts that host inside the provider container and routes it to the `ControlApi` entrypoint, which needs no auth. Any other host needs the bearer; without one the script exits 2.
+When the URL host is `control.internal`, no bearer is sent: the Worker intercepts that host inside the provider container and routes it to the `ControlApi` entrypoint, which needs no auth. Any other host needs the bearer, and without one the script exits 2.
 
-## Protocol (D11)
+## Protocol
 
 1. `POST $CF_ORBS_URL/v1/orbs/$ORB_ID/ops` with body `{op, snapshotId?, image?, token?, ampUrl?}`. Reply (2xx): `{opId, attached}`. `attached: true` means an identical op was already running; the script prints `attaching to running <op> <opId>`.
 2. `GET $CF_ORBS_URL/v1/ops/$opId?wait=20&since=<lines printed so far>` until the deadline. The server answers when the op ends, when `progress` has more than `since` lines, or when the wait passes (capped at 25 s). Reply (200): an op record with top-level `phase` (`queued|running|succeeded|failed`), `progress` (the whole array of strings, append-only, capped at about 200 lines) and `error` (string, when failed). The script prints each progress line once. A 404 means the op is unknown; the script fails with "retry the message".
@@ -43,7 +43,12 @@ Error replies (4xx/5xx) may carry `{"error": "<one line>"}`; the script prints i
 ## Output
 
 - First line: `cf-orbs: <op> <orbId>`.
+- Then `started <op> <opId>`, or `attaching to running <op> <opId>`.
 - Then one line per progress line from the server.
+- On a retried request: `control plane: <cause>, retry <n> of 2`.
+- On success, a last line `cf-orbs: <op> <orbId> done in <n> s`.
+
+Amp shows these lines in the thread setup log.
 - On failure, one final line `Failed: <cause> — fix: <command>` on stdout and on stderr.
 - Exit codes: 0 ok, 1 failure, 2 bad input.
 

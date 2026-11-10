@@ -35,7 +35,7 @@ Keep these when you change the file:
    ```
 
    Pin versions where you can (`pkg=<version>`; `apt-cache policy <pkg>` in the image shows the
-   version). A rebuild with unpinned packages can give a different image (see below).
+   version), because a rebuild with unpinned packages can give a different image (see below).
 2. Check it locally:
 
    ```sh
@@ -57,18 +57,19 @@ Keep these when you change the file:
 Repo setup that is specific to one project belongs in that repo's `.agents/setup`, not here. Amp runs it
 when an orb starts, and project snapshots keep the result.
 
-## Snapshots are tied to their image
+## Snapshots and the image
 
-A snapshot (a pause, or an Amp project snapshot) holds the disk changes on top of the image it was
-taken from. It is only valid on that image. So:
+A snapshot (a pause, or an Amp project snapshot) holds an orb's disk. The image still matters for
+paused orbs, so:
 
 - Never use a tag such as `:latest` in `FROM`. Keep the digest pin.
 - A change to this file, or a rebuild without cache, gives a new image under the same key `orb`. Tested: snapshots from the old image still restore on the new one, and a restored disk keeps its old content. New image content reaches only orbs started from the image. If a restore fails with "snapshot not found", the orb starts from the new image and Amp sets the repo up again.
 - Do not remove an image key while a snapshot that uses it is younger than 30 days.
 - To move to a newer Amp orb image, run `cf-orbs upgrade --digest sha256:<new>`. It bumps the digest
   and keeps the old image buildable under a new key `orb-<short>` (`image/orb-<short>.Dockerfile` and
-  an `images` entry). Paused orbs and project snapshots still name key `orb`, which is now the new image,
-  so they may not restore (R18). Push or commit their work first. `upgrade` prints the cache steps from
+  an `images` entry). Paused orbs and project snapshots still name key `orb`, which is now the new image.
+  They restore on it, as tested above. `upgrade` still warns that they may not, and asks you to push or
+  commit their work first. `upgrade` prints the cache steps from
   "Add toolchains" step 4; do them.
 - Orbs that are awake during a deploy keep the old Worker code until they pause (a Cloudflare
   behaviour). They keep running on the image they started from.

@@ -1,6 +1,6 @@
 # Architecture
 
-cf-orbs is a self-hosted Amp orb provider. Amp sends orb jobs. cf-orbs runs each orb as a Cloudflare Container and saves its disk as a snapshot when the orb pauses. For the Amp side of the contract, read [the provider contract](01-amp-orb-provider-contract.md).
+cf-orbs is a self-hosted Amp orb provider. Amp sends it orb jobs, and cf-orbs runs each orb as a Cloudflare Container and saves its disk as a snapshot when the orb pauses. For the Amp side of the contract, read [the provider contract](01-amp-orb-provider-contract.md).
 
 ## Parts
 
@@ -39,13 +39,13 @@ The first match wins:
 3. This is a new orb and `ORB_SNAPSHOT_ID` maps to a snapshot: restore that (Amp's project snapshot, so repo setup is skipped).
 4. Start from the orb image.
 
-Then `amp orb bootstrap` starts in its own process group with the orb token from Amp. The token goes only into the process environment and the state file keeps only a hash. Spawn succeeds when the bootstrap is alive and Amp reports it connected.
+Then `amp orb bootstrap` starts in its own process group with the orb token from Amp. The token goes only into the process environment, and the state file keeps only a hash. Spawn succeeds when the bootstrap is alive and Amp reports it connected.
 
 ## Pause and billing
 
 Pause stops the Amp processes, masks token shapes in the log files, takes a snapshot of the disk and destroys the container. A paused orb has no compute charge. The next message restores the disk (about 0.6 s for the container, 2-3 s for the whole spawn). With `warmMinutes` above 0, the container and Amp's processes stay up for a while after the disk is saved, so a quick follow-up needs no restore.
 
-Compute is billed while an orb runs: memory and disk for the whole time, CPU only on active use. See [the price table in the README](../README.md#costs). Cloudflare publishes no snapshot storage rate yet; `cf-orbs status` shows the retained snapshot size, and `cf-orbs snapshots prune` removes snapshots that nothing uses.
+Compute is billed while an orb runs: memory and disk for the whole time, CPU only on active use. See [the price table in the README](../README.md#costs). Cloudflare publishes no snapshot storage rate yet. `cf-orbs status` shows the retained snapshot size, and `cf-orbs snapshots prune` removes snapshots that nothing uses.
 
 ## Rules that shape the code
 

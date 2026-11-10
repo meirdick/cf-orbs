@@ -74,8 +74,8 @@ After each code change, run `npm run build -w cli`, then `node cli/bin/cf-orbs.j
 
 Things that catch people out:
 
-- A Durable Object that holds a running container keeps the old Worker code after a deploy. Your change reaches an orb only after its DO is evicted. Pause or delete the orb, or test on a new thread. Ops must work across code versions.
-- Amp caches one project snapshot per provider for 72 h (Amp → Orb Settings → Snapshots). After you change the bootstrap, `.agents/setup` or the image, delete that snapshot, or new threads start from the old disk.
+- A Durable Object that holds a running container keeps the old Worker code after a deploy. Your change reaches an orb only after its DO is evicted. So pause or delete the orb, or test on a new thread. It also means ops must work across code versions.
+- Amp caches one project snapshot per provider for 72 h (Amp → Orb Settings → Snapshots). After you change the bootstrap, `.agents/setup` or the image, delete that snapshot, or new threads will start from the old disk.
 - `/etc/hosts` is read-only after a snapshot restore.
 
 Remove the test install with `node cli/bin/cf-orbs.js uninstall --dir ~/orbs-dev --yes`.

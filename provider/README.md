@@ -1,6 +1,8 @@
 # Provider host
 
-`amp orb provider` pulls orb jobs from Amp and runs `dispatch.sh` once per job. `dispatch.sh` sends the job to the cf-orbs control plane. You run one provider per provider token, in one of two places:
+The provider is the process that takes orb jobs from Amp.
+
+`amp orb provider` pulls orb jobs from Amp and runs `dispatch.sh` once per job, and `dispatch.sh` sends the job to the cf-orbs control plane. You run one provider per provider token, in one of two places:
 
 | | Cloudflare-hosted (default) | External host |
 | --- | --- | --- |
@@ -12,7 +14,7 @@
 
 ## Cloudflare-hosted mode
 
-`cf-orbs init` sets this up. What runs:
+`cf-orbs init` sets this up. Here is what runs:
 
 - Image: `provider/Dockerfile` (`node:24-bookworm-slim` by digest, `@ampcode/cli` pinned by `ARG AMP_CLI_VERSION=0.0.1793390435-g08e9ec`, `curl`, `tini`, `/app/dispatch.sh`, `/app/entry.sh`). Wrangler builds it as the named image `provider`. In an installed project, `cf-orbs deploy` copies `provider/` and `dispatch/` into `.cf-orbs/` and generates this entry in `.cf-orbs/wrangler.jsonc` (build context `.cf-orbs/`, which mirrors the repo root):
 
@@ -34,11 +36,11 @@ cf-orbs logs --provider   # provider log tail (redacted)
 cf-orbs doctor            # fails on a missing token secret or two providers on one token
 ```
 
-The Worker runs the provider only while the secret `AMP_ORB_PROVIDER_TOKEN` exists. It does not read `providerHost`; the CLI does.
+The Worker runs the provider only while the secret `AMP_ORB_PROVIDER_TOKEN` exists. It does not read `providerHost` (only the CLI does).
 
 The `ProviderHost` DO keeps its container running all the time, so it can keep old Worker code after a deploy for a long time (Cloudflare: a DO that holds a running container keeps the code it loaded). The start, restart and stop checks below work in old and new code, but check the result with `cf-orbs status` and `cf-orbs doctor` after a change.
 
-`Error: Amp rejected the orb provider token` in the log means the secret is wrong or revoked. Put a new one (see Rotate) and the next check restarts the provider.
+`Error: Amp rejected the orb provider token` in the log means the secret is wrong or revoked. Set a new one (see Rotate), and the next check restarts the provider.
 
 ## External mode
 
@@ -102,20 +104,20 @@ Use this when you want the Amp token to stay off Cloudflare, or when the CF prov
 
 ## One provider per token
 
-Run exactly one provider for each token. A second provider on the same token logs "Another amp orb provider is connected… Waiting for it to stop" and takes no jobs until the first stops. Do not pass `--allow-multiple`. One provider handles all jobs; a second adds nothing.
+Run exactly one provider for each token. A second provider on the same token logs "Another amp orb provider is connected… Waiting for it to stop" and takes no jobs until the first stops. Do not pass `--allow-multiple`. One provider handles all jobs, so a second adds nothing.
 
 One provider serves one orb size (Amp sends no size). For a second size, make a second provider token and a second install.
 
 ## Rotate the provider token
 
 1. In Amp: Settings → Orbs → your provider → create a new token. Keep the old one for now.
-2. Put the new token:
+2. Set the new token:
    - CF mode: write the new token to a file (mode 600), then `cf-orbs init --token-file <file>` (or `npx wrangler secret put AMP_ORB_PROVIDER_TOKEN --config .cf-orbs/wrangler.jsonc`). `init` calls `POST /v1/provider/start`; that check, or the next cron or alarm (≤ 5 min), sees a different token hash, stops the old container and starts a new one. If `cf-orbs status` still shows the old start time after 10 min, see the note on old Worker code above and report it: this path is not yet tested on a live install.
    - External mode: edit `/etc/cf-orbs/provider.env`, then `sudo systemctl restart cf-orbs-provider`.
 3. Check `cf-orbs status` (or the journal) for a clean start with no "rejected" line.
 4. Revoke the old token in Amp.
 
-Jobs that arrive during the restart wait in Amp (it offers unclaimed jobs again). Orb state lives in the Worker, so none is lost.
+Jobs that arrive during the restart wait in Amp, which offers unclaimed jobs again. Orb state lives in the Worker, so none is lost.
 
 ## Files
 

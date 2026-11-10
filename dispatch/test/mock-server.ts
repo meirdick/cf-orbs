@@ -61,12 +61,18 @@ function sendRaw(res: ServerResponse, status: number, body: string): void {
 
 /** ?format=text: answer as the Worker does (core/text.ts). A body that is not JSON goes out as it is. */
 function sendAs(target: URL, res: ServerResponse, status: number, body: string): void {
-  if (target.searchParams.get("format") !== "text") return sendRaw(res, status, body);
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(body);
-  } catch {
-    return sendRaw(res, status, body);
+  let isJson = target.searchParams.get("format") === "text";
+  if (isJson) {
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      isJson = false;
+    }
+  }
+  if (!isJson) {
+    sendRaw(res, status, body);
+    return;
   }
   const since = Number(target.searchParams.get("since") ?? "0") || 0;
   res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });

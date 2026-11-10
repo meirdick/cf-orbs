@@ -86,7 +86,7 @@ clean() {
     _cn=$((_cn + 1))
     case $_cc in
       [A-Za-z0-9._:/-]) C=$C$_cc ;;
-      *) C=$C? ;;
+      *) C="$C?" ;;
     esac
   done
 }

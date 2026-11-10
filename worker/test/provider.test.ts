@@ -24,7 +24,6 @@ import {
   PROVIDER_INACTIVITY_MS,
   PROVIDER_LOG,
   PROVIDER_LOG_TAIL_MS,
-  PROVIDER_PROBE_MS,
   PROVIDER_WATCHDOG_GAP_MS,
   type ProviderContainerPort,
   ProviderController,

@@ -225,7 +225,7 @@ export const PROVIDER_BUILD_FILES = ["provider/Dockerfile", "provider/entry.sh",
  * The provider container size, as text. Keep in step with PROVIDER_INSTANCE in worker/src/provider.ts.
  * It is part of the provider build, so a deploy that changes the size restarts a running provider.
  */
-export const PROVIDER_INSTANCE_KEY = "1vcpu-3072mib-4000mb";
+export const PROVIDER_INSTANCE_KEY = "standard-1";
 
 /**
  * First 16 hex of sha256 over the provider image inputs and the provider container size. deploy writes it to the Worker as

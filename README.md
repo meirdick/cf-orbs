@@ -172,7 +172,7 @@ Rates: [Cloudflare Containers pricing](https://developers.cloudflare.com/contain
 | Item | Cost (USD) |
 | --- | --- |
 | Workers Paid plan | $5.00/month |
-| Provider container (1 vCPU, 3 GiB, always on) | ~$20/month |
+| Provider container (`standard-1`: 1/2 vCPU, 4 GiB, always on) | ~$27/month |
 | Default orb (4 vCPU, 12 GiB, 20 GB), awake | $0.113/h fixed + CPU: ~$0.171/h at 20% CPU, ~$0.401/h at 100% |
 | Orb with `--vcpu 2` (2 vCPU, 6 GiB, 20 GB), awake | $0.059/h fixed + CPU: ~$0.088/h at 20% CPU, ~$0.203/h at 100% |
 | Paused orb | No compute charge. Snapshot storage price is not published yet (beta) |

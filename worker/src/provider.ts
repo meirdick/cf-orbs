@@ -17,10 +17,10 @@ export const PROVIDER_IMAGE_KEY = "provider";
 /**
  * Size of the provider container. Not "lite": on 1/16 vCPU each dispatch run took over a minute once some
  * jobs ran at the same time, Amp timed out and sent the spawn again, and new threads never started.
- * 1 vCPU and 3 GiB is the smallest custom size ("basic" is not accepted by start()).
+ * "standard-1" (1/2 vCPU, 4 GiB) is the next named size that start() accepts ("basic" is rejected).
  * Keep cli/src/project.ts PROVIDER_INSTANCE_KEY in step: it makes deploy restart a running provider.
  */
-export const PROVIDER_INSTANCE: InstanceSpec = { vcpu: 1, memoryMib: 3072, diskMb: 4000 };
+export const PROVIDER_INSTANCE: InstanceSpec = "standard-1";
 export const CONTROL_HOST = "control.internal";
 export const CONTROL_URL = `http://${CONTROL_HOST}`;
 export const PROVIDER_LOG = "/var/log/cf-orbs-provider.log";

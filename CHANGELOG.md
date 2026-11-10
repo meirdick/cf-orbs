@@ -8,7 +8,7 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
-- New threads did not start when some spawn jobs ran at the same time. The provider container had 1/16 vCPU (`lite`), so each dispatch run took more than a minute. Amp timed out, sent the spawn again with a new token, and the orb never got its setup requests. The provider container now has 1 vCPU and 3 GiB. `cf-orbs deploy` restarts a running provider on the new size.
+- New threads did not start when some spawn jobs ran at the same time. The provider container had 1/16 vCPU (`lite`), so each dispatch run took more than a minute. Amp timed out, sent the spawn again with a new token, and the orb never got its setup requests. The provider container is now `standard-1` (1/2 vCPU, 4 GiB). `cf-orbs deploy` restarts a running provider on the new size.
 - `/v1/status` no longer waits on a provider container that does not answer. The log read stops after 5 s and the log tail says so. Before, `cf-orbs status`, `cf-orbs doctor` and `cf-orbs logs --provider` timed out exactly when the provider was overloaded.
 
 ### Added
@@ -17,7 +17,7 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ### Changed
 
-- Cost: the always-on provider container is about $20 a month, up from about $2. To avoid that charge, run the provider on your own machine (`providerHost: "external"`).
+- Cost: the always-on provider container is about $27 a month, up from about $2. To avoid that charge, run the provider on your own machine (`providerHost: "external"`).
 
 ## [0.2.4] - 2026-11-03
 

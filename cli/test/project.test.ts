@@ -139,10 +139,8 @@ describe("providerBuild", () => {
 
   it("PROVIDER_INSTANCE_KEY matches the size the Worker starts the provider with", async () => {
     const src = await readFile(new URL("../../worker/src/provider.ts", import.meta.url), "utf8");
-    const m = /PROVIDER_INSTANCE: InstanceSpec = \{ vcpu: (\d+), memoryMib: (\d+), diskMb: (\d+) \}/.exec(
-      src,
-    );
+    const m = /PROVIDER_INSTANCE: InstanceSpec = "([a-z0-9-]+)";/.exec(src);
     expect(m).not.toBeNull();
-    expect(PROVIDER_INSTANCE_KEY).toBe(`${m?.[1]}vcpu-${m?.[2]}mib-${m?.[3]}mb`);
+    expect(PROVIDER_INSTANCE_KEY).toBe(m?.[1]);
   });
 });

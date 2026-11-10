@@ -189,7 +189,7 @@ describe("ProviderController", () => {
     expect(container.starts).toHaveLength(1);
     expect(container.starts[0]).toMatchObject({
       image: "registry.cloudflare.com/x/provider@sha256:1",
-      instance: { vcpu: 1, memoryMib: 3072, diskMb: 4000 },
+      instance: "standard-1",
       enableInternet: true,
       env: { AMP_ORB_PROVIDER_TOKEN: TOKEN, CF_ORBS_URL: CONTROL_URL },
     });

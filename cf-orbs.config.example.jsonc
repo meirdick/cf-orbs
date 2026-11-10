@@ -47,6 +47,11 @@
   // Where `amp orb provider` runs: "cloudflare" (a small container in this Worker) or "external" (your own host).
   "providerHost": "cloudflare",
 
+  // Size of the provider container when providerHost is "cloudflare". It runs all the time.
+  // "lite" (1/16 vCPU, 256 MiB, about $2 a month) is enough for the tested load: 10 spawns at once.
+  // "standard-1" (1/2 vCPU, 4 GiB, about $27 a month) or "standard-2" if `cf-orbs doctor` says the provider is slow.
+  "providerInstance": "lite",
+
   // Extra orb images: ORB_IMAGE ref -> image key. Each key needs image/<key>.Dockerfile.
   // The default Amp image always maps to key "orb" (image/Dockerfile). `cf-orbs upgrade` adds old keys here.
   "images": {},

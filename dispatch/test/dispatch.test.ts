@@ -350,8 +350,9 @@ describe(`dispatch.sh secrets (${SHELL})`, () => {
       expect(all).not.toContain(secret);
       expect(r.argv).not.toContain(secret);
     }
-    expect(all).toContain("aop_live_[redacted]");
-    expect(all).toContain("Bearer [redacted]");
+    // The Worker redacts by pattern (its markers use <>); the script removes its exact secrets ([redacted]).
+    expect(all).toContain("aop_live_<redacted>");
+    expect(all).toContain("Bearer <redacted>");
     expect(all).toContain("raw [redacted]");
     expect(mock.posts()[0]?.body?.token).toBe(ORB_TOKEN);
   });

@@ -70,7 +70,7 @@ export interface SpawnEntry {
 /** OrbRecord.spawns keeps this many entries, oldest first. */
 export const SPAWN_HISTORY = 10;
 
-/** Any Cloudflare Containers instance size. "lite" (1/16 vCPU, 256 MiB) is too small for cf-orbs. */
+/** Any Cloudflare Containers instance size. "lite" (1/16 vCPU, 256 MiB) is used only by the provider container. */
 export type InstanceSpec =
   | "lite"
   | "standard-1"

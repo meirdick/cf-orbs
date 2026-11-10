@@ -3,7 +3,9 @@
 // Also accepts absolute-form request targets, so it can act as an HTTP proxy for http://control.internal.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { replyText } from "../../worker/src/core/text";
 import type { OpPhase, OpRecord, OpRequest } from "../../worker/src/core/types";
+import { redactLine } from "../../worker/src/orb/journal";
 
 export interface MockPoll {
   phase: OpPhase;
@@ -52,9 +54,23 @@ export interface MockServer {
   close(): Promise<void>;
 }
 
-function send(res: ServerResponse, status: number, body: string): void {
+function sendRaw(res: ServerResponse, status: number, body: string): void {
   res.writeHead(status, { "content-type": "application/json" });
   res.end(body);
+}
+
+/** ?format=text: answer as the Worker does (core/text.ts). A body that is not JSON goes out as it is. */
+function sendAs(target: URL, res: ServerResponse, status: number, body: string): void {
+  if (target.searchParams.get("format") !== "text") return sendRaw(res, status, body);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return sendRaw(res, status, body);
+  }
+  const since = Number(target.searchParams.get("since") ?? "0") || 0;
+  res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
+  res.end(replyText(parsed, since, redactLine));
 }
 
 export async function startMockServer(scenario: MockScenario = {}): Promise<MockServer> {
@@ -80,6 +96,7 @@ export async function startMockServer(scenario: MockScenario = {}): Promise<Mock
     };
     requests.push(rec);
     const sc = state.scenario;
+    const send = (r: ServerResponse, status: number, body: string) => sendAs(target, r, status, body);
 
     const post = target.pathname.match(/^\/v1\/orbs\/([^/]+)\/ops$/);
     if (req.method === "POST" && post) {
@@ -132,7 +149,7 @@ export async function startMockServer(scenario: MockScenario = {}): Promise<Mock
   };
 
   const server = createServer((req, res) => {
-    handle(req, res).catch(() => send(res, 500, JSON.stringify({ error: "mock crashed" })));
+    handle(req, res).catch(() => sendRaw(res, 500, JSON.stringify({ error: "mock crashed" })));
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const port = (server.address() as AddressInfo).port;

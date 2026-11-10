@@ -15,17 +15,40 @@ import { restartProvider } from "./provider-restart";
 
 export const PROVIDER_IMAGE_KEY = "provider";
 /**
- * Size of the provider container. Not "lite": on 1/16 vCPU each dispatch run took over a minute once some
- * jobs ran at the same time, Amp timed out and sent the spawn again, and new threads never started.
- * "standard-1" (1/2 vCPU, 4 GiB) is the next named size that start() accepts ("basic" is rejected).
- * Keep cli/src/project.ts PROVIDER_INSTANCE_KEY in step: it makes deploy restart a running provider.
+ * Sizes the provider container can have. "lite" (1/16 vCPU, 256 MiB) is the default: the provider only holds
+ * the `amp orb provider` connection and starts dispatch.sh, which starts 2 processes for a job. Measured on
+ * Cloudflare: 10 spawns at once and 200 jobs in 15 min with no slowdown. start() does not accept "basic".
  */
-export const PROVIDER_INSTANCE: InstanceSpec = "standard-1";
+export const PROVIDER_INSTANCES = ["lite", "standard-1", "standard-2"] as const;
+export type ProviderInstance = (typeof PROVIDER_INSTANCES)[number];
+export const DEFAULT_PROVIDER_INSTANCE: ProviderInstance = "lite";
+
+/** providerInstance from CF_ORBS_CONFIG. Anything else than a known size gives the default. */
+export function providerInstanceOf(configJson: string | undefined): ProviderInstance {
+  try {
+    const v = (JSON.parse(configJson ?? "{}") as { providerInstance?: unknown }).providerInstance;
+    if ((PROVIDER_INSTANCES as readonly unknown[]).includes(v)) return v as ProviderInstance;
+  } catch {
+    // Bad config JSON is reported by the orb paths; the provider keeps the default size.
+  }
+  return DEFAULT_PROVIDER_INSTANCE;
+}
+
 export const CONTROL_HOST = "control.internal";
 export const CONTROL_URL = `http://${CONTROL_HOST}`;
 export const PROVIDER_LOG = "/var/log/cf-orbs-provider.log";
 /** status() gives the log read this long. A slow container must not block /v1/status. */
 export const PROVIDER_LOG_TAIL_MS = 5_000;
+/**
+ * Watchdog (the 5-min alarm): a provider container that runs but does not answer `true` in PROVIDER_PROBE_MS
+ * is slow or stuck, and Amp jobs then run late. After PROVIDER_SLOW_CHECKS such checks in a row it is restarted.
+ * No probe in the first PROVIDER_GRACE_MS after a start (amp starts slowly on "lite"), and at most one watchdog
+ * restart in PROVIDER_WATCHDOG_GAP_MS, so a provider under real load is not restarted in a loop.
+ */
+export const PROVIDER_PROBE_MS = 5_000;
+export const PROVIDER_SLOW_CHECKS = 2;
+export const PROVIDER_GRACE_MS = 10 * 60_000;
+export const PROVIDER_WATCHDOG_GAP_MS = 30 * 60_000;
 export const PROVIDER_INACTIVITY_MS = 6 * 3600_000; // 21600000
 export const PROVIDER_ALARM_MS = 5 * 60_000;
 export const STATE_KEY = "provider";
@@ -47,6 +70,8 @@ export interface ProviderState {
   stopped?: boolean; // set by stop(); the alarm does not restart a stopped provider
   image?: string; // image ref the running container started from (images().provider)
   build?: string; // CF_ORBS_PROVIDER_BUILD the running container started from
+  slowChecks?: number; // watchdog: alarm checks in a row with no answer from the container
+  watchdogRestartAt?: string; // ISO, last restart by the watchdog
 }
 
 export interface ProviderStatus {
@@ -185,6 +210,8 @@ export interface ProviderDeps {
   kv: KV;
   clock: Clock;
   token?: string;
+  /** Container size (providerInstance in the config). Default "lite". */
+  instance?: InstanceSpec;
   /** CF_ORBS_PROVIDER_BUILD of the deploy this DO runs: a hash of the provider image inputs. */
   build?: string;
   /** Log sink for the one-line image change record (console.log in the DO). */
@@ -274,6 +301,12 @@ export class ProviderController {
         stopped: !!s.stopped && s.v >= 2,
       });
       s.lastCheck = this.iso();
+      if (trigger === "alarm" && dec.action === "keep" && (await this.unresponsive(s))) {
+        dec.action = "restart";
+        dec.reason = `provider container did not answer ${PROVIDER_SLOW_CHECKS} checks in a row (slow or stuck)`;
+        s.watchdogRestartAt = this.iso();
+        this.d.log?.(`provider: ${dec.reason}; restarting`);
+      }
       if (dec.action === "none") {
         // No token now means external-host mode. A CF provider left running would hold the token's slot
         // and the external provider would wait for it forever, so stop it.
@@ -315,7 +348,7 @@ export class ProviderController {
           try {
             c.start({
               image,
-              instance: PROVIDER_INSTANCE,
+              instance: this.d.instance ?? DEFAULT_PROVIDER_INSTANCE,
               enableInternet: true,
               env: { AMP_ORB_PROVIDER_TOKEN: token as string, CF_ORBS_URL: CONTROL_URL },
               labels: { role: "provider" },
@@ -327,6 +360,7 @@ export class ProviderController {
             s.image = image;
             s.build = this.d.build;
             s.stopped = false;
+            s.slowChecks = 0;
             if (prevImage && prevImage !== image)
               this.d.log?.(`provider: image changed ${short8(prevImage)} -> ${short8(image)}; restarted`);
           } catch (e) {
@@ -349,6 +383,27 @@ export class ProviderController {
       await this.d.setAlarm(nextAlarm(this.d.clock.now()));
       return { ...dec, state: s };
     });
+  }
+
+  /** Watchdog probe (see PROVIDER_PROBE_MS). Counts in s.slowChecks. True: restart the container now. */
+  private async unresponsive(s: ProviderState): Promise<boolean> {
+    const now = this.d.clock.now();
+    if (s.startedAt && now - Date.parse(s.startedAt) < PROVIDER_GRACE_MS) return false;
+    try {
+      const r = await within(
+        this.d.container.exec(["true"], PROVIDER_PROBE_MS),
+        PROVIDER_PROBE_MS,
+        "no answer",
+      );
+      if (r.exitCode !== 0) throw new Error(`exit ${r.exitCode}`);
+      s.slowChecks = 0;
+      return false;
+    } catch {
+      s.slowChecks = (s.slowChecks ?? 0) + 1;
+    }
+    if (s.slowChecks < PROVIDER_SLOW_CHECKS) return false;
+    if (s.watchdogRestartAt && now - Date.parse(s.watchdogRestartAt) < PROVIDER_WATCHDOG_GAP_MS) return false;
+    return true;
   }
 
   /**
@@ -445,6 +500,7 @@ export class ProviderHost extends DurableObject<Env> {
       kv: wrapStorage(ctx.storage),
       clock: realClock,
       token: env.AMP_ORB_PROVIDER_TOKEN,
+      instance: providerInstanceOf(env.CF_ORBS_CONFIG),
       build: env.CF_ORBS_PROVIDER_BUILD,
       log: (l) => console.log(l),
       controlApi: () => {

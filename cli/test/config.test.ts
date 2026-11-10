@@ -207,3 +207,15 @@ describe("validation", () => {
     ]);
   });
 });
+
+describe("providerInstance", () => {
+  it("defaults to lite and accepts the named provider sizes", () => {
+    expect(validateConfig({}).providerInstance).toBe("lite");
+    expect(validateConfig({ providerInstance: "standard-1" }).providerInstance).toBe("standard-1");
+  });
+  it("rejects a size the provider cannot start with", () => {
+    expect(() => validateConfig({ providerInstance: "basic" })).toThrow(
+      /providerInstance must be one of lite, standard-1, standard-2/,
+    );
+  });
+});

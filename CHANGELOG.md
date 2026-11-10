@@ -8,16 +8,21 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ### Fixed
 
-- New threads did not start when some spawn jobs ran at the same time. The provider container had 1/16 vCPU (`lite`), so each dispatch run took more than a minute. Amp timed out, sent the spawn again with a new token, and the orb never got its setup requests. The provider container is now `standard-1` (1/2 vCPU, 4 GiB). `cf-orbs deploy` restarts a running provider on the new size.
-- `/v1/status` no longer waits on a provider container that does not answer. The log read stops after 5 s and the log tail says so. Before, `cf-orbs status`, `cf-orbs doctor` and `cf-orbs logs --provider` timed out exactly when the provider was overloaded.
+- New threads did not start on an install whose provider container had become slow. A spawn that takes 1 s took the dispatch program more than 90 s, Amp timed out after 300 s and sent the spawn again with a new token, and the orb never got its setup requests. The cause of the slow container is not known: it had run for 7 days, and a new `lite` container handled 10 spawns at once and 200 jobs in 15 min in tests. Three changes make the provider safe against it:
+  - Watchdog: every 5 min the Worker asks the provider container to run `true`. If it does not answer in 5 s two times in a row, the Worker restarts the container. No check in the first 10 min after a start, and at most one such restart in 30 min.
+  - `dispatch.sh` starts 2 processes for a job that is already done (was about 25). It reads the Worker's new plain-text replies (`?format=text`) with shell builtins and needs only `sh`, `curl` and `sleep` (no `awk` or `sed`).
+  - The Worker sends progress lines in groups, so dispatch polls less often.
+- `/v1/status` no longer waits on a provider container that does not answer. The log read stops after 5 s and the log tail says so. Before, one slow read blocked `cf-orbs status`, `cf-orbs doctor`, `cf-orbs logs --provider` and the 5-min provider check.
 
 ### Added
 
+- Config `providerInstance`: size of the provider container, `"lite"` (default), `"standard-1"` or `"standard-2"`. `cf-orbs deploy` restarts a running provider when the size changes.
 - `cf-orbs doctor` fails the `provider` check when the provider container runs but does not answer a log read.
+- `GET /v1/ops/<id>` and `POST /v1/orbs/<orb>/ops` accept `?format=text`. The JSON replies are unchanged, so an older `dispatch.sh` on an external host keeps working.
 
 ### Changed
 
-- Cost: the always-on provider container is about $27 a month, up from about $2. To avoid that charge, run the provider on your own machine (`providerHost: "external"`).
+- External provider hosts: copy the new `dispatch/dispatch.sh` after you deploy the Worker. The new script needs a Worker from 0.2.5 or later.
 
 ## [0.2.4] - 2026-11-03
 

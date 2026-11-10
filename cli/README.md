@@ -172,7 +172,7 @@ Rates: [Cloudflare Containers pricing](https://developers.cloudflare.com/contain
 | Item | Cost (USD) |
 | --- | --- |
 | Workers Paid plan | $5.00/month |
-| Provider container (`standard-1`: 1/2 vCPU, 4 GiB, always on) | ~$27/month |
+| Provider container (`lite`, always on) | ~$2.01/month (`providerInstance: "standard-1"`: ~$27/month) |
 | Default orb (4 vCPU, 12 GiB, 20 GB), awake | $0.113/h fixed + CPU: ~$0.171/h at 20% CPU, ~$0.401/h at 100% |
 | Orb with `--vcpu 2` (2 vCPU, 6 GiB, 20 GB), awake | $0.059/h fixed + CPU: ~$0.088/h at 20% CPU, ~$0.203/h at 100% |
 | Paused orb | No compute charge. Snapshot storage price is not published yet (beta) |
@@ -215,6 +215,7 @@ The config is `cf-orbs.config.jsonc` in your project directory. Edit it, then ru
 | `prewarm` | 2 | After each deploy, start N throwaway instances (0-5) from the new image, wait until they answer, destroy them. This raises the odds that the next spawn finds the 1.8 GB image on its host (6 s, not 40-50 s). Cloudflare picks the host, so it is no guarantee. Cost: about 1 min of the orb size per instance. 0 = off |
 | `fastTmpfsGb` | 0 (off) | Each spawn mounts a memory-backed tmpfs of N GiB (`huge=always`) at `/mnt/fast`, for caches and temp data. 512 MB writes in 0.06-0.21 s there, 1.3 s on the root disk. Not in snapshots: lost on pause. Uses memory only for the files in it. 0-8, and at most the orb memory in GiB minus 3 |
 | `projectSnapshotRefresh` | `"off"` | `"on-change"`: when a new thread starts from a project snapshot, cf-orbs forgets the snapshot if amp updated itself or the orb image digest changed (at most once per project per 24 h). The next new thread runs setup. If Amp keeps its cached copy, delete it in Amp → Orb Settings → Snapshots |
+| `providerInstance` | `lite` | Size of the provider container: `lite` (1/16 vCPU, 256 MiB), `standard-1` or `standard-2`. Raise it if `cf-orbs doctor` reports a slow provider |
 | `providerHost` | `cloudflare` | Where `amp orb provider` runs: in your Worker, or `external` (your own host; see [provider/README.md](https://github.com/meirdick/cf-orbs/blob/main/provider/README.md)) |
 | `images` | `{}` | Extra `ORB_IMAGE` refs → image keys. Each key needs `image/<key>.Dockerfile` |
 | `debugExec` | `false` | Turns on the exec and bench routes. Only for the substrate benchmark |
@@ -287,7 +288,7 @@ Known gaps:
 - The plan check before the first deploy is best effort: it asks wrangler to list Containers and stops only on a clear plan or login error. Any other error is a warning, and a Free account may still find out from the deploy error.
 - Paused orbs restore after an image rebuild. A restored disk keeps its old content; new image content reaches only orbs started from the image.
 - Orb lost mid-turn: Amp spawns the orb again and the agent runs the failed tool call again. The disk is kept; running processes and shell state are lost.
-- Not tested yet: the provider under more than 10 jobs at the same time, restore after the source image is deleted from the registry, the Desktop pane, and Docker inside an orb. Snapshot storage has no published price (beta).
+- Not tested yet: the provider on `lite` for more than a day without a restart or with more than 10 jobs at the same time, restore after the source image is deleted from the registry, the Desktop pane, and Docker inside an orb. Snapshot storage has no published price (beta).
 - Seen once: an orb's Durable Object reset during a long spawn wait. The op failed and Amp retried.
 - Limits: 4 vCPU, 12 GiB memory and 20 GB disk per orb at most (Amp-hosted orbs have 60 GB). One size per install.
 - Writes of new data are slower on the root disk; use `/mnt/fast` for caches (set `fastTmpfsGb`). See [docs/benchmarks.md](https://github.com/meirdick/cf-orbs/blob/main/docs/benchmarks.md#known-limits-measured).

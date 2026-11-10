@@ -222,16 +222,11 @@ export async function materialize(
 export const PROVIDER_BUILD_FILES = ["provider/Dockerfile", "provider/entry.sh", "dispatch/dispatch.sh"];
 
 /**
- * The provider container size, as text. Keep in step with PROVIDER_INSTANCE in worker/src/provider.ts.
- * It is part of the provider build, so a deploy that changes the size restarts a running provider.
- */
-export const PROVIDER_INSTANCE_KEY = "standard-1";
-
-/**
- * First 16 hex of sha256 over the provider image inputs and the provider container size. deploy writes it to the Worker as
+ * First 16 hex of sha256 over the provider image inputs and the provider container size (providerInstance),
+ * so a deploy that changes the size restarts a running provider. deploy writes it to the Worker as
  * CF_ORBS_PROVIDER_BUILD; ProviderHost restarts its container when it changes. A missing file hashes as empty.
  */
-export async function providerBuild(p: ProjectPaths): Promise<string> {
+export async function providerBuild(p: ProjectPaths, instance = "lite"): Promise<string> {
   const h = createHash("sha256");
   for (const f of PROVIDER_BUILD_FILES) {
     const file = join(p.stateDir, f);
@@ -239,7 +234,7 @@ export async function providerBuild(p: ProjectPaths): Promise<string> {
     h.update(existsSync(file) ? await readFile(file) : "");
     h.update("\0");
   }
-  h.update(`instance\0${PROVIDER_INSTANCE_KEY}\0`);
+  h.update(`instance\0${instance}\0`);
   return h.digest("hex").slice(0, 16);
 }
 
@@ -250,7 +245,7 @@ export async function writeWranglerConfig(
   accountId?: string,
 ): Promise<string> {
   await mkdir(p.stateDir, { recursive: true });
-  const build = await providerBuild(p);
+  const build = await providerBuild(p, c.providerInstance);
   await writeFile(p.wrangler, renderWranglerJsonc(c, { accountId, providerBuild: build }));
   return build;
 }

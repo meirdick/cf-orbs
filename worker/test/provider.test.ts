@@ -20,14 +20,18 @@ import {
   ensureProviderRunning,
   nextAlarm,
   PROVIDER_ALARM_MS,
+  PROVIDER_GRACE_MS,
   PROVIDER_INACTIVITY_MS,
   PROVIDER_LOG,
   PROVIDER_LOG_TAIL_MS,
+  PROVIDER_PROBE_MS,
+  PROVIDER_WATCHDOG_GAP_MS,
   type ProviderContainerPort,
   ProviderController,
   type ProviderDecisionInput,
   ProviderHost,
   type ProviderState,
+  providerInstanceOf,
   redactLine,
   STATE_KEY,
   short8,
@@ -183,13 +187,13 @@ describe("redactLine / tokenSha16", () => {
 });
 
 describe("ProviderController", () => {
-  it("first ensure starts the provider size with token env, intercepts control.internal, sets timeout and alarm", async () => {
+  it("first ensure starts lite with token env, intercepts control.internal, sets timeout and alarm", async () => {
     const { ctl, container, kv, clock, alarm } = setup();
     const s = await ctl.ensure("ensure");
     expect(container.starts).toHaveLength(1);
     expect(container.starts[0]).toMatchObject({
       image: "registry.cloudflare.com/x/provider@sha256:1",
-      instance: "standard-1",
+      instance: "lite",
       enableInternet: true,
       env: { AMP_ORB_PROVIDER_TOKEN: TOKEN, CF_ORBS_URL: CONTROL_URL },
     });
@@ -327,6 +331,99 @@ describe("ProviderController", () => {
     expect(JSON.stringify(st)).not.toContain(TOKEN);
     expect(st.logTail[0]).toBe("2026-10-30T20:00:00Z job token [redacted]");
     expect((await ctl.status(false)).logTail).toEqual([]);
+  });
+
+  it("starts the size from the config", async () => {
+    const container = new FakeProviderContainer();
+    const ctl = new ProviderController({
+      container,
+      kv: new MemoryKV(),
+      clock: new FakeClock(),
+      token: TOKEN,
+      instance: providerInstanceOf('{"providerInstance":"standard-1"}'),
+      controlApi: () => FETCHER,
+      setAlarm: async () => {},
+      deleteAlarm: async () => {},
+    });
+    await ctl.ensure("ensure");
+    expect(container.starts[0]?.instance).toBe("standard-1");
+    expect(providerInstanceOf(undefined)).toBe("lite");
+    expect(providerInstanceOf('{"providerInstance":"basic"}')).toBe("lite");
+    expect(providerInstanceOf("not json")).toBe("lite");
+  });
+
+  describe("watchdog", () => {
+    const hang = () => new Promise<never>(() => {});
+    // check() awaits crypto.subtle before the probe, and that resolves on the event loop, not in a
+    // microtask. So fake only setTimeout, and advance until the alarm ends.
+    const fakeTimeouts = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    async function alarmWithTimers(ctl: ProviderController) {
+      let done = false;
+      const p = ctl.alarm().finally(() => {
+        done = true;
+      });
+      while (!done) {
+        await new Promise((r) => setImmediate(r));
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      await p;
+    }
+
+    it("restarts a provider that does not answer 2 alarm checks in a row, then waits before the next restart", async () => {
+      fakeTimeouts();
+      try {
+        const log: string[] = [];
+        const { ctl, container, clock, kv } = setup({ log });
+        await ctl.ensure("ensure");
+        container.exec = hang;
+        // Inside the grace period after a start: no probe.
+        await alarmWithTimers(ctl);
+        expect((kv.map.get(STATE_KEY) as ProviderState).slowChecks ?? 0).toBe(0);
+        clock.advance(PROVIDER_GRACE_MS + 1);
+        await alarmWithTimers(ctl);
+        expect(container.starts).toHaveLength(1);
+        expect((kv.map.get(STATE_KEY) as ProviderState).slowChecks).toBe(1);
+        await alarmWithTimers(ctl);
+        expect(container.starts).toHaveLength(2);
+        expect(container.destroyCount).toBe(1);
+        const s = kv.map.get(STATE_KEY) as ProviderState;
+        expect(s.lastStop?.reason).toMatch(/did not answer 2 checks in a row/);
+        expect(s.slowChecks).toBe(0);
+        expect(log.join("\n")).toMatch(/restarting/);
+        // Still slow after the restart: no second restart inside the gap.
+        clock.advance(PROVIDER_GRACE_MS + 1);
+        await alarmWithTimers(ctl);
+        await alarmWithTimers(ctl);
+        await alarmWithTimers(ctl);
+        expect(container.starts).toHaveLength(2);
+        clock.advance(PROVIDER_WATCHDOG_GAP_MS);
+        await alarmWithTimers(ctl);
+        expect(container.starts).toHaveLength(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("a provider that answers is kept, and one slow check is forgotten", async () => {
+      fakeTimeouts();
+      try {
+        const { ctl, container, clock, kv } = setup();
+        await ctl.ensure("ensure");
+        clock.advance(PROVIDER_GRACE_MS + 1);
+        const answer = container.exec.bind(container);
+        container.exec = hang;
+        await alarmWithTimers(ctl);
+        container.exec = answer;
+        await ctl.alarm();
+        expect((kv.map.get(STATE_KEY) as ProviderState).slowChecks).toBe(0);
+        expect(container.execLog.at(-1)).toEqual(["true"]);
+        container.exec = hang;
+        await alarmWithTimers(ctl);
+        expect(container.starts).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   it("status answers when the log read hangs (an overloaded provider container)", async () => {

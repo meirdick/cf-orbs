@@ -1,6 +1,6 @@
 # dispatch
 
-`dispatch.sh` is the program that `amp orb provider` runs once per job. It sends the job to the cf-orbs control plane and prints progress until the job ends. It is POSIX `sh` and needs only `curl`, `sed`, `awk`, `date` and `sleep`. It does not need `jq` or Node.
+`dispatch.sh` is the program that `amp orb provider` runs once per job. It sends the job to the cf-orbs control plane and prints progress until the job ends. It is POSIX `sh` and needs only `curl` and `sleep` (and `date` on a system with no `/proc/uptime`). It starts few processes on purpose (2 for a job that is already done), because the provider container has little CPU. It does not need `jq` or Node.
 
 ## Use
 
@@ -34,9 +34,11 @@ When the URL host is `control.internal`, no bearer is sent: the Worker intercept
 
 ## Protocol
 
-1. `POST $CF_ORBS_URL/v1/orbs/$ORB_ID/ops` with body `{op, snapshotId?, image?, token?, ampUrl?}`. Reply (2xx): `{opId, attached}`. `attached: true` means an identical op was already running; the script prints `attaching to running <op> <opId>`.
-2. `GET $CF_ORBS_URL/v1/ops/$opId?wait=20&since=<lines printed so far>` until the deadline. The server answers when the op ends, when `progress` has more than `since` lines, or when the wait passes (capped at 25 s). Reply (200): an op record with top-level `phase` (`queued|running|succeeded|failed`), `progress` (the whole array of strings, append-only, capped at about 200 lines) and `error` (string, when failed). The script prints each progress line once. A 404 means the op is unknown; the script fails with "retry the message".
+1. `POST $CF_ORBS_URL/v1/orbs/$ORB_ID/ops?format=text` with body `{op, snapshotId?, image?, token?, ampUrl?}`. Reply (2xx): `{opId, attached}`. `attached: true` means an identical op was already running; the script prints `attaching to running <op> <opId>`.
+2. `GET $CF_ORBS_URL/v1/ops/$opId?wait=20&since=<lines printed so far>&format=text` until the deadline. The server answers when the op ends, when `progress` has more than `since` lines, or when the wait passes (capped at 25 s). Reply (200): an op record with top-level `phase` (`queued|running|succeeded|failed`), `progress` (the whole array of strings, append-only, capped at about 200 lines) and `error` (string, when failed). The script prints each progress line once. A 404 means the op is unknown; the script fails with "retry the message".
 3. `succeeded` → exit 0. `failed` → `Failed: <error>`, exit 1. Deadline → `Failed: control plane did not finish <op> within 270 s — fix: cf-orbs logs <orbId>`, exit 1.
+
+With `?format=text` the Worker sends the same replies as `key=value` lines, which the script reads with shell builtins: `opId=` and `attached=` for the POST; `phase=`, `total=`, `error=` and one `progress=` line for each line after `since` for the GET; `error=` for an error. Without `format=text` the replies are JSON (used by scripts from before 0.2.5). The new script needs a Worker from 0.2.5 or later.
 
 Error replies (4xx/5xx) may carry `{"error": "<one line>"}`; the script prints it. Curl errors, 408, 429 and 5xx are retried: 3 attempts, 2 s apart.
 

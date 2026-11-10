@@ -3,12 +3,11 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { parseConfigText } from "../src/config";
+import { PROVIDER_INSTANCES, parseConfigText } from "../src/config";
 import {
   ensureGitignore,
   fileMode,
   materialize,
-  PROVIDER_INSTANCE_KEY,
   projectPaths,
   providerBuild,
   readControlToken,
@@ -137,10 +136,16 @@ describe("providerBuild", () => {
     }
   });
 
-  it("PROVIDER_INSTANCE_KEY matches the size the Worker starts the provider with", async () => {
+  it("changes with the provider container size", async () => {
+    const p = projectPaths(dir);
+    await materialize(p, { templates });
+    expect(await providerBuild(p, "lite")).toBe(await providerBuild(p));
+    expect(await providerBuild(p, "standard-1")).not.toBe(await providerBuild(p, "lite"));
+  });
+
+  it("the CLI and the Worker list the same provider sizes", async () => {
     const src = await readFile(new URL("../../worker/src/provider.ts", import.meta.url), "utf8");
-    const m = /PROVIDER_INSTANCE: InstanceSpec = "([a-z0-9-]+)";/.exec(src);
-    expect(m).not.toBeNull();
-    expect(PROVIDER_INSTANCE_KEY).toBe(m?.[1]);
+    const m = /PROVIDER_INSTANCES = \[([^\]]+)\]/.exec(src);
+    expect(m?.[1]?.replace(/[" ]/g, "").split(",")).toEqual([...PROVIDER_INSTANCES]);
   });
 });

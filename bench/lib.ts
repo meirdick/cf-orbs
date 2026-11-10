@@ -166,7 +166,8 @@ export const RATES = {
   ampEnterpriseCpuHour: 0.0504,
   ampEnterpriseGBHour: 0.0162,
   workersPaidMonth: 5,
-  providerMonth: 27.4,
+  providerLiteMonth: 2.01,
+  providerCustomMonth: 20,
   amp: { "a1.tiny": 0.08, "a1.small": 0.17, "a1.medium": 0.33 } as Record<string, number>,
 };
 

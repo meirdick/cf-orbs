@@ -835,3 +835,77 @@ describe("waitForOp", () => {
     expect((n as unknown as { waiters: Map<string, Set<unknown>> }).waiters.get("x")?.size ?? 0).toBe(0);
   });
 });
+
+describe("text replies for dispatch.sh (?format=text)", () => {
+  const op: OpRecord = {
+    opId: "amp-T-1:11111111-1111-4111-8111-111111111111",
+    orbId: "amp-T-1",
+    op: "spawn",
+    inputsHash: "h",
+    phase: "running",
+    startedAt: "2026-11-10T00:00:00.000Z",
+    progress: ["0.0s one", "0.5s two\twith\u0001control", "0.9s three"],
+  };
+
+  it("POST ops answers opId and attached as key=value lines", async () => {
+    const { env } = fakeEnv({}, { "ORB.submitOp": () => ({ opId: op.opId, attached: true }) });
+    const r = await handleApi(
+      req("/v1/orbs/amp-T-1/ops?format=text", { method: "POST", body: JSON.stringify({ op: "pause" }) }),
+      env,
+      { internal: true },
+    );
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toMatch(/^text\/plain/);
+    expect(await r.text()).toBe(`opId=${op.opId}\nattached=true\n`);
+  });
+
+  it("GET op answers phase, total and only the progress lines after since, one per line", async () => {
+    const { env } = fakeEnv({}, { "ORB.getOp": () => op });
+    const r = await handleApi(req(`/v1/ops/${op.opId}?wait=0&since=1&format=text`), env, { internal: true });
+    expect(await r.text()).toBe(
+      "phase=running\ntotal=3\nprogress=0.5s two with control\nprogress=0.9s three\n",
+    );
+  });
+
+  it("a long-poll with new lines waits a moment and sends the lines that came in the meantime", async () => {
+    vi.useFakeTimers();
+    try {
+      let n = 0;
+      const later = { ...op, progress: [...op.progress, "1.0s four"] };
+      const { env, calls } = fakeEnv({}, { "ORB.getOp": () => (n++ === 0 ? op : later) });
+      const pending = handleApi(req(`/v1/ops/${op.opId}?wait=20&since=2&format=text`), env, {
+        internal: true,
+      });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(await (await pending).text()).toBe(
+        "phase=running\ntotal=4\nprogress=0.9s three\nprogress=1.0s four\n",
+      );
+      expect(calls.filter((c) => c.method === "getOp").map((c) => c.args[1])).toEqual([20_000, 0]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a failed op carries its error line", async () => {
+    const failed = { ...op, phase: "failed", error: "Failed: boom — fix: retry" };
+    const { env } = fakeEnv({}, { "ORB.getOp": () => failed });
+    const r = await handleApi(req(`/v1/ops/${op.opId}?since=3&format=text`), env, { internal: true });
+    expect(await r.text()).toBe("phase=failed\ntotal=3\nerror=Failed: boom — fix: retry\n");
+  });
+
+  it("errors keep their status and become one error= line", async () => {
+    const { env } = fakeEnv();
+    const r = await handleApi(req("/v1/ops/nope?format=text"), env, { internal: true });
+    expect(r.status).toBe(400);
+    expect(await r.text()).toMatch(/^error=Failed: invalid op id nope — fix: [^\n]+\n$/);
+    const denied = await handleApi(req("/v1/health?format=text"), env, { internal: false });
+    expect(denied.status).toBe(401);
+    expect(await denied.text()).toMatch(/^error=Failed: missing or wrong bearer token/);
+  });
+
+  it("without format=text the JSON replies are unchanged", async () => {
+    const { env } = fakeEnv({}, { "ORB.getOp": () => op });
+    const r = await handleApi(req(`/v1/ops/${op.opId}?since=1`), env, { internal: true });
+    expect((await body(r)).progress).toHaveLength(3);
+  });
+});

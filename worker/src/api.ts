@@ -4,6 +4,7 @@
 // Responses never carry stack traces. Errors are one line: "Failed: <cause> — fix: <action>".
 import { parseConfig } from "./core/config";
 import { PRUNE_DEFAULT_AGE_MS } from "./core/registry-core";
+import { replyText } from "./core/text";
 import {
   type AmpOp,
   type OpRecord,
@@ -16,7 +17,15 @@ import {
 } from "./core/types";
 import { type Env, orbDoName, PROVIDER_DO_NAME, REGISTRY_DO_NAME } from "./env";
 import { BENCH_ORB_RE, type BenchStartRequest, parseBenchStart } from "./orb/bench";
+import { redactLine } from "./orb/journal";
 import { restartProvider } from "./provider-restart";
+
+/** Text-mode long-poll: after new progress lines, wait this long for more before the reply. */
+export const TEXT_LINGER_MS = 400;
+
+function isRunning(rec: OpRecord): boolean {
+  return rec.phase === "queued" || rec.phase === "running";
+}
 
 export const API_VERSION = "0.2.5";
 
@@ -95,6 +104,27 @@ export interface ApiOptions {
 }
 
 export async function handleApi(req: Request, env: Env, opts: ApiOptions): Promise<Response> {
+  const res = await handleJson(req, env, opts);
+  const q = new URL(req.url).searchParams;
+  if (q.get("format") !== "text") return res;
+  return asText(res, clampInt(q.get("since"), 0, 1_000_000, 0));
+}
+
+/** ?format=text: the same reply as key=value lines (core/text.ts). Status is kept. */
+async function asText(res: Response, since: number): Promise<Response> {
+  let v: unknown;
+  try {
+    v = await res.json();
+  } catch {
+    v = undefined;
+  }
+  return new Response(replyText(v, since, redactLine), {
+    status: res.status,
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+async function handleJson(req: Request, env: Env, opts: ApiOptions): Promise<Response> {
   try {
     if (!opts.internal) {
       const denied = await checkAuth(req, env);
@@ -247,7 +277,16 @@ async function route(req: Request, env: Env, internal: boolean): Promise<Respons
     const waitMs = clampSeconds(url.searchParams.get("wait"), 0, MAX_WAIT_MS);
     const sinceRaw = url.searchParams.get("since");
     const since = sinceRaw === null ? undefined : clampInt(sinceRaw, 0, 1_000_000, 0);
-    const rec = await orbStub(env, parsed.orbId).getOp(opId as string, waitMs, since);
+    const stub = orbStub(env, parsed.orbId);
+    let rec = await stub.getOp(opId as string, waitMs, since);
+    // dispatch.sh (text mode) polls again after each reply with new lines, and each poll starts a process
+    // in the provider container. Progress lines come in groups, so wait a moment and send the group in one reply.
+    if (rec && waitMs > 0 && url.searchParams.get("format") === "text" && isRunning(rec)) {
+      if (rec.progress.length > (since ?? 0)) {
+        await new Promise((r) => setTimeout(r, TEXT_LINGER_MS));
+        rec = (await stub.getOp(opId as string, 0, since)) ?? rec;
+      }
+    }
     if (!rec) return fail(404, `op ${opId} not found`, "start the op again with POST /v1/orbs/<orb>/ops");
     return json(200, rec);
   }

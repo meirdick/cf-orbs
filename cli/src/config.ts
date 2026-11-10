@@ -63,11 +63,17 @@ export const AMP_DEFAULT_IMAGE_REPO = "us-central1-docker.pkg.dev/amp-prod-0/amp
 
 export type ProviderHostMode = "cloudflare" | "external";
 
+/** Sizes of the provider container. Copy of worker/src/provider.ts PROVIDER_INSTANCES. */
+export const PROVIDER_INSTANCES = ["lite", "standard-1", "standard-2"] as const;
+export type ProviderInstance = (typeof PROVIDER_INSTANCES)[number];
+
 /** Full config file: ProviderConfig plus CLI-only fields. */
 export interface CfOrbsConfig extends ProviderConfig {
   /** Worker name. Default "cf-orbs". A second install (another size) needs another name. */
   name: string;
   providerHost: ProviderHostMode;
+  /** Size of the provider container (providerHost "cloudflare"). Default "lite". */
+  providerInstance: ProviderInstance;
   debugSsh: boolean;
 }
 
@@ -75,6 +81,7 @@ export const DEFAULT_CLI_CONFIG: CfOrbsConfig = {
   name: "cf-orbs",
   ...structuredClone(DEFAULT_CONFIG),
   providerHost: "cloudflare",
+  providerInstance: "lite",
   debugSsh: false,
 };
 
@@ -443,6 +450,14 @@ export function validateConfig(raw: unknown): CfOrbsConfig {
     }
     out.providerHost = raw.providerHost;
   }
+  if (raw.providerInstance !== undefined) {
+    if (!(PROVIDER_INSTANCES as readonly unknown[]).includes(raw.providerInstance)) {
+      fail(
+        `providerInstance must be one of ${PROVIDER_INSTANCES.join(", ")}, got ${JSON.stringify(raw.providerInstance)}`,
+      );
+    }
+    out.providerInstance = raw.providerInstance as ProviderInstance;
+  }
   if (raw.debugSsh !== undefined) {
     if (typeof raw.debugSsh !== "boolean")
       fail(`debugSsh must be true or false, got ${JSON.stringify(raw.debugSsh)}`);
@@ -500,6 +515,7 @@ export function defaultConfigText(overrides: Partial<CfOrbsConfig> = {}): string
   "prewarm": ${c.prewarm}, // 0-5 throwaway instances after each deploy, to pull the new image onto hosts; 0 = off
   "projectSnapshotRefresh": ${JSON.stringify(c.projectSnapshotRefresh)}, // "off" | "on-change": forget a project snapshot after an amp or image change
   "providerHost": ${JSON.stringify(c.providerHost)}, // "cloudflare" | "external"
+  "providerInstance": ${JSON.stringify(c.providerInstance)}, // provider container size: "lite" (default) | "standard-1" | "standard-2"
   "images": ${JSON.stringify(c.images)}, // ORB_IMAGE ref -> image key (image/<key>.Dockerfile)
   "debugSsh": ${c.debugSsh}
 }

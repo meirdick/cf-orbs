@@ -6,7 +6,7 @@ The provider is the process that takes orb jobs from Amp.
 
 | | Cloudflare-hosted (default) | External host |
 | --- | --- | --- |
-| Where `amp orb provider` runs | `ProviderHost` container (`lite`) in your Worker | A machine you run (VM, server, laptop) |
+| Where `amp orb provider` runs | `ProviderHost` container (1 vCPU, 3 GiB) in your Worker | A machine you run (VM, server, laptop) |
 | Where the Amp token lives | Worker secret `AMP_ORB_PROVIDER_TOKEN`; passed only to the provider container env | An env file on your host. Never in Cloudflare |
 | How dispatch reaches the control plane | `http://control.internal`, routed inside Cloudflare to the `ControlApi` entrypoint. The public `/v1` API is also on, with bearer `CONTROL_TOKEN` (the CLI uses it) | `https://<worker>.workers.dev/v1` with bearer `CONTROL_TOKEN` |
 | Restart on failure | Entry loop (5 s, backing off to 5 min) + DO alarm every 5 min + cron | systemd `Restart=always` |
@@ -25,7 +25,7 @@ The provider is the process that takes orb jobs from Amp.
 
   In this repo, `worker/wrangler.jsonc` uses `"../provider/Dockerfile"` with build context `".."`.
 
-- `ProviderHost` DO (single name `provider`) starts the container with `instance: "lite"`, `enableInternet: true` and env `AMP_ORB_PROVIDER_TOKEN`, `CF_ORBS_URL=http://control.internal`. It routes `control.internal` to `ctx.exports.ControlApi` with `interceptOutboundHttp`, sets a 6 h inactivity timeout, and arms an alarm every 5 min. The alarm restarts a dead container and refreshes the timeout. The Worker cron calls the same check.
+- `ProviderHost` DO (single name `provider`) starts the container with `instance: { vcpu: 1, memoryMib: 3072, diskMb: 4000 }`, `enableInternet: true` and env `AMP_ORB_PROVIDER_TOKEN`, `CF_ORBS_URL=http://control.internal`. It routes `control.internal` to `ctx.exports.ControlApi` with `interceptOutboundHttp`, sets a 6 h inactivity timeout, and arms an alarm every 5 min. The alarm restarts a dead container and refreshes the timeout. The Worker cron calls the same check.
 - `entry.sh` runs `amp orb provider /app/dispatch.sh` in a loop. Output is redacted (`aop_live_…`, the exact token, JWTs, long base64/hex runs) and written to stdout and `/var/log/cf-orbs-provider.log` (capped at 5 MB).
 
 Check it:
@@ -44,7 +44,7 @@ The `ProviderHost` DO keeps its container running all the time, so it can keep o
 
 ## External mode
 
-Use this when you want the Amp token to stay off Cloudflare, or when the CF provider does not fit (for example, `lite` runs out of memory).
+Use this when you want the Amp token to stay off Cloudflare, or when you do not want to pay for the always-on provider container (about $20 a month).
 
 1. Run `cf-orbs init --provider external` (or set `"providerHost": "external"` in `cf-orbs.config.jsonc` and run `cf-orbs deploy`). In external mode every deploy deletes the Worker secret `AMP_ORB_PROVIDER_TOKEN` and re-sends `CONTROL_TOKEN`. Within 5 min the `ProviderHost` alarm sees no token and stops the CF provider. Do not start the external one before that: Amp makes a second provider on the same token wait for the first. `cf-orbs doctor` fails while the CF provider still runs.
 2. On the host: Node 22 or later, `curl`. Copy `dispatch.sh` from your project (`.cf-orbs/dispatch/dispatch.sh`; in a clone, `dispatch/dispatch.sh`):

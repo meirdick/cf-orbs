@@ -14,10 +14,18 @@ import { tokenSha } from "./orb/journal";
 import { restartProvider } from "./provider-restart";
 
 export const PROVIDER_IMAGE_KEY = "provider";
-export const PROVIDER_INSTANCE: InstanceSpec = "lite";
+/**
+ * Size of the provider container. Not "lite": on 1/16 vCPU each dispatch run took over a minute once some
+ * jobs ran at the same time, Amp timed out and sent the spawn again, and new threads never started.
+ * 1 vCPU and 3 GiB is the smallest custom size ("basic" is not accepted by start()).
+ * Keep cli/src/project.ts PROVIDER_INSTANCE_KEY in step: it makes deploy restart a running provider.
+ */
+export const PROVIDER_INSTANCE: InstanceSpec = { vcpu: 1, memoryMib: 3072, diskMb: 4000 };
 export const CONTROL_HOST = "control.internal";
 export const CONTROL_URL = `http://${CONTROL_HOST}`;
 export const PROVIDER_LOG = "/var/log/cf-orbs-provider.log";
+/** status() gives the log read this long. A slow container must not block /v1/status. */
+export const PROVIDER_LOG_TAIL_MS = 5_000;
 export const PROVIDER_INACTIVITY_MS = 6 * 3600_000; // 21600000
 export const PROVIDER_ALARM_MS = 5 * 60_000;
 export const STATE_KEY = "provider";
@@ -185,6 +193,24 @@ export interface ProviderDeps {
   controlApi: () => Fetcher;
   setAlarm: (at: number) => Promise<void>;
   deleteAlarm: () => Promise<void>;
+}
+
+/** p, or an Error(message) after ms. An exec in a starved container can outlast its own abort signal. */
+function within<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  p.catch(() => undefined);
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(message)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
 }
 
 function oneLine(e: unknown): string {
@@ -360,7 +386,11 @@ export class ProviderController {
       let logTail: string[] = [];
       if (withLog && c.running) {
         try {
-          const r = await c.exec(["tail", "-n", "20", PROVIDER_LOG], 10_000);
+          const r = await within(
+            c.exec(["tail", "-n", "20", PROVIDER_LOG], PROVIDER_LOG_TAIL_MS),
+            PROVIDER_LOG_TAIL_MS,
+            `the provider container did not answer in ${PROVIDER_LOG_TAIL_MS / 1000} s; it can be overloaded`,
+          );
           const secrets = this.d.token ? [this.d.token] : [];
           logTail = r.stdout
             .split("\n")

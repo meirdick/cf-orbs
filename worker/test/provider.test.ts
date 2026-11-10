@@ -22,6 +22,7 @@ import {
   PROVIDER_ALARM_MS,
   PROVIDER_INACTIVITY_MS,
   PROVIDER_LOG,
+  PROVIDER_LOG_TAIL_MS,
   type ProviderContainerPort,
   ProviderController,
   type ProviderDecisionInput,
@@ -182,13 +183,13 @@ describe("redactLine / tokenSha16", () => {
 });
 
 describe("ProviderController", () => {
-  it("first ensure starts lite with token env, intercepts control.internal, sets timeout and alarm", async () => {
+  it("first ensure starts the provider size with token env, intercepts control.internal, sets timeout and alarm", async () => {
     const { ctl, container, kv, clock, alarm } = setup();
     const s = await ctl.ensure("ensure");
     expect(container.starts).toHaveLength(1);
     expect(container.starts[0]).toMatchObject({
       image: "registry.cloudflare.com/x/provider@sha256:1",
-      instance: "lite",
+      instance: { vcpu: 1, memoryMib: 3072, diskMb: 4000 },
       enableInternet: true,
       env: { AMP_ORB_PROVIDER_TOKEN: TOKEN, CF_ORBS_URL: CONTROL_URL },
     });
@@ -326,6 +327,28 @@ describe("ProviderController", () => {
     expect(JSON.stringify(st)).not.toContain(TOKEN);
     expect(st.logTail[0]).toBe("2026-10-30T20:00:00Z job token [redacted]");
     expect((await ctl.status(false)).logTail).toEqual([]);
+  });
+
+  it("status answers when the log read hangs (an overloaded provider container)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { ctl, container } = setup();
+      await ctl.ensure("ensure");
+      container.exec = () => new Promise(() => {});
+      const pending = ctl.status();
+      await vi.advanceTimersByTimeAsync(PROVIDER_LOG_TAIL_MS + 1);
+      const st = await pending;
+      expect(st.running).toBe(true);
+      expect(st.logTail).toEqual([
+        `(log unavailable: the provider container did not answer in ${PROVIDER_LOG_TAIL_MS / 1000} s; it can be overloaded)`,
+      ]);
+      // The next call is not stuck behind the hung read.
+      const again = ctl.status();
+      await vi.advanceTimersByTimeAsync(PROVIDER_LOG_TAIL_MS + 1);
+      expect((await again).running).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

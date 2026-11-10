@@ -81,6 +81,19 @@ describe("doctor status checks", () => {
     for (const x of c) expect(x.detail).toMatch(/^Failed: [^\n]+ — fix: [^\n]+$/);
     expect(c[1]?.detail).toContain("orb-deadbeef0000");
   });
+  it("FAIL when the provider runs but its log read timed out (overloaded container)", () => {
+    const st = {
+      provider: {
+        running: true,
+        logTail: ["(log unavailable: the provider container did not answer in 5 s; it can be overloaded)"],
+      },
+    };
+    const c = statusChecks(st, validateConfig({}))[0];
+    expect(c?.status).toBe("FAIL");
+    expect(c?.detail).toMatch(/overloaded/);
+    expect(c?.detail).toMatch(/fix: run cf-orbs deploy/);
+  });
+
   it("skips the provider check in external mode", () => {
     expect(statusChecks({}, validateConfig({ providerHost: "external" }))[0]?.status).toBe("SKIP");
   });

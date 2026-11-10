@@ -63,6 +63,16 @@ export function statusChecks(
           ),
         ),
       );
+    } else if (p.running === true && /^\(log unavailable: .*did not answer/.test(p.lastLogLine ?? "")) {
+      out.push(
+        failed(
+          "provider",
+          new CliError(
+            "the provider container runs but did not answer a log read, so it is overloaded and Amp jobs run late",
+            "run cf-orbs deploy (from 0.2.5 the provider container is larger); if it stays, see cf-orbs logs --provider",
+          ),
+        ),
+      );
     } else if (p.running === true) out.push(pass("provider", `running${last}`));
     else {
       out.push(

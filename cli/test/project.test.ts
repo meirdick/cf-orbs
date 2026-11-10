@@ -8,6 +8,7 @@ import {
   ensureGitignore,
   fileMode,
   materialize,
+  PROVIDER_INSTANCE_KEY,
   projectPaths,
   providerBuild,
   readControlToken,
@@ -134,5 +135,14 @@ describe("providerBuild", () => {
       expect(seen.has(b)).toBe(false);
       seen.add(b);
     }
+  });
+
+  it("PROVIDER_INSTANCE_KEY matches the size the Worker starts the provider with", async () => {
+    const src = await readFile(new URL("../../worker/src/provider.ts", import.meta.url), "utf8");
+    const m = /PROVIDER_INSTANCE: InstanceSpec = \{ vcpu: (\d+), memoryMib: (\d+), diskMb: (\d+) \}/.exec(
+      src,
+    );
+    expect(m).not.toBeNull();
+    expect(PROVIDER_INSTANCE_KEY).toBe(`${m?.[1]}vcpu-${m?.[2]}mib-${m?.[3]}mb`);
   });
 });

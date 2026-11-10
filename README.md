@@ -172,7 +172,7 @@ Rates: [Cloudflare Containers pricing](https://developers.cloudflare.com/contain
 | Item | Cost (USD) |
 | --- | --- |
 | Workers Paid plan | $5.00/month |
-| Provider container (`lite`, always on) | ~$2.01/month |
+| Provider container (1 vCPU, 3 GiB, always on) | ~$20/month |
 | Default orb (4 vCPU, 12 GiB, 20 GB), awake | $0.113/h fixed + CPU: ~$0.171/h at 20% CPU, ~$0.401/h at 100% |
 | Orb with `--vcpu 2` (2 vCPU, 6 GiB, 20 GB), awake | $0.059/h fixed + CPU: ~$0.088/h at 20% CPU, ~$0.203/h at 100% |
 | Paused orb | No compute charge. Snapshot storage price is not published yet (beta) |
@@ -280,14 +280,14 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Status and known gaps
 
-v0.2.4. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
+v0.2.5. The control plane, dispatch program, provider host and CLI are built and unit tested. On 2026-10-30 a real Amp thread ran end to end on a fresh install: spawn from the image, setup, pause with a project snapshot, wake from the snapshot in 2.3 s, first answer 41 s after the message.
 
 Known gaps:
 
 - The plan check before the first deploy is best effort: it asks wrangler to list Containers and stops only on a clear plan or login error. Any other error is a warning, and a Free account may still find out from the deploy error.
 - Paused orbs restore after an image rebuild. A restored disk keeps its old content; new image content reaches only orbs started from the image.
 - Orb lost mid-turn: Amp spawns the orb again and the agent runs the failed tool call again. The disk is kept; running processes and shell state are lost.
-- Not tested yet: the provider's memory on `lite` over 24 h, restore after the source image is deleted from the registry, the Desktop pane, and Docker inside an orb. Snapshot storage has no published price (beta).
+- Not tested yet: the provider under more than 10 jobs at the same time, restore after the source image is deleted from the registry, the Desktop pane, and Docker inside an orb. Snapshot storage has no published price (beta).
 - Seen once: an orb's Durable Object reset during a long spawn wait. The op failed and Amp retried.
 - Limits: 4 vCPU, 12 GiB memory and 20 GB disk per orb at most (Amp-hosted orbs have 60 GB). One size per install.
 - Writes of new data are slower on the root disk; use `/mnt/fast` for caches (set `fastTmpfsGb`). See [docs/benchmarks.md](docs/benchmarks.md#known-limits-measured).

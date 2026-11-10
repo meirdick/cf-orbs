@@ -4,6 +4,21 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-10
+
+### Fixed
+
+- New threads did not start when some spawn jobs ran at the same time. The provider container had 1/16 vCPU (`lite`), so each dispatch run took more than a minute. Amp timed out, sent the spawn again with a new token, and the orb never got its setup requests. The provider container now has 1 vCPU and 3 GiB. `cf-orbs deploy` restarts a running provider on the new size.
+- `/v1/status` no longer waits on a provider container that does not answer. The log read stops after 5 s and the log tail says so. Before, `cf-orbs status`, `cf-orbs doctor` and `cf-orbs logs --provider` timed out exactly when the provider was overloaded.
+
+### Added
+
+- `cf-orbs doctor` fails the `provider` check when the provider container runs but does not answer a log read.
+
+### Changed
+
+- Cost: the always-on provider container is about $20 a month, up from about $2. To avoid that charge, run the provider on your own machine (`providerHost: "external"`).
+
 ## [0.2.4] - 2026-11-03
 
 ### Added
@@ -158,7 +173,8 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/meirdick/cf-orbs/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/meirdick/cf-orbs/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/meirdick/cf-orbs/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/meirdick/cf-orbs/compare/v0.2.1...v0.2.2

@@ -4,6 +4,8 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-12
+
 ### Added
 
 - `cf-orbs status <orb>` shows `disk image`: the image the orb's disk came from, and whether it is older than the image now deployed under that key. A paused orb that restores after `cf-orbs upgrade` or a `deploy` with a new digest keeps its old disk content; this shows it. A handle saved before this version has no image ref and shows `unknown`.
@@ -186,7 +188,8 @@ First public release.
 - Once in M1, an `OrbSession` reset during the connect wait (the op ended as failed). Cause not yet found; the API now logs 5xx causes.
 - Amp does not show dispatch progress lines in the thread setup log. Use `cf-orbs logs <orb>`.
 
-[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/meirdick/cf-orbs/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/meirdick/cf-orbs/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/meirdick/cf-orbs/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/meirdick/cf-orbs/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/meirdick/cf-orbs/compare/v0.2.2...v0.2.3

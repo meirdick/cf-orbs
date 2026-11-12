@@ -35,9 +35,9 @@ import { runDelete } from "./delete";
 import { ExclusiveQueue } from "./exclusive";
 import {
   appendProgress,
+  diskImageState,
   errText,
   finishOp,
-  type Handle,
   handleExpiresAt,
   iso,
   loadOrb,
@@ -321,7 +321,13 @@ export class OrbSession extends DurableObject<Env> implements OrbSessionApi {
         break;
       }
     }
-    if (orb.handle) out.snapshotExpiresAt = iso(handleExpiresAt(orb.handle as Handle));
+    if (orb.handle) {
+      out.snapshotExpiresAt = iso(handleExpiresAt(orb.handle));
+      const disk = diskImageState(orb.handle, this.ctx.container?.images ?? {});
+      if (disk.imageRef) out.diskImageRef = disk.imageRef;
+      if (disk.currentImageRef) out.currentImageRef = disk.currentImageRef;
+      if (disk.stale) out.diskImageStale = true;
+    }
     if (running) out.bootstrap = await this.bootstrapAlive();
     const colo = await this.colo();
     if (colo) out.doColo = colo;

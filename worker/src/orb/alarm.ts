@@ -242,10 +242,12 @@ async function checkpoint(ctx: OrbContext, rec: OrbRecord): Promise<void> {
   try {
     await container.exec(["sync"], { timeoutMs: 60_000 });
     const snap = await container.snapshot(`checkpoint-${orbId}-${t}`);
+    const imageRef = container.images()[rec.imageKey];
     const handle: Handle = {
       id: snap.id,
       size: snap.size,
       imageKey: rec.imageKey,
+      ...(imageRef ? { imageRef } : {}),
       instance: rec.instance,
       createdAt: iso(clock.now()),
       name: `checkpoint-${orbId}`,

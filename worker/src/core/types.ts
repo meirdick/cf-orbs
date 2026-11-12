@@ -49,6 +49,8 @@ export interface SnapshotHandle {
   id: string; // Cloudflare snapshot id
   size: number; // bytes reported by snapshotContainer
   imageKey: string; // key in images map the snapshot was taken from
+  /** Deployed image ref (with digest) the disk came from, at pause time. Absent in handles from older code. */
+  imageRef?: string;
   instance: OrbInstanceSpec;
   createdAt: string; // ISO
   lastRestoredAt?: string; // ISO; set on every successful restore. Expiry = max(createdAt, lastRestoredAt) + 30 d (D7)
@@ -238,6 +240,12 @@ export interface OrbStatus {
   bootstrap?: { alive: boolean; pid?: number };
   inFlightOp?: Pick<OpRecord, "opId" | "op" | "phase" | "startedAt">;
   snapshotExpiresAt?: string;
+  /** Deployed image ref (with digest) the orb's disk came from. Absent in handles from older code. */
+  diskImageRef?: string;
+  /** Deployed image ref for the orb's image key now. Absent when that key is not deployed. */
+  currentImageRef?: string;
+  /** True when both refs are known and differ: the disk came from an older image under the same key. */
+  diskImageStale?: boolean;
   /** Colo the orb's Durable Object runs in (from /cdn-cgi/trace). Best effort. */
   doColo?: string;
 }

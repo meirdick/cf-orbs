@@ -33,7 +33,12 @@ describe("runPause (D14)", () => {
     expect(r.ok).toBe(true);
     const rec = await orb(h);
     expect(rec.state).toBe("paused");
-    expect(rec.handle).toMatchObject({ id: r.handle!.id, imageKey: "orb", instance: "standard-2" });
+    expect(rec.handle).toMatchObject({
+      id: r.handle!.id,
+      imageKey: "orb",
+      imageRef: "registry.cloudflare.com/acct/cf-orbs-orb@sha256:deadbeef",
+      instance: "standard-2",
+    });
     expect(rec.handle!.size).toBeGreaterThan(0);
     expect(rec.handle!.createdAt).toBe(new Date(h.clock.now()).toISOString());
     expect(rec.awakeSince).toBeUndefined();
@@ -41,7 +46,8 @@ describe("runPause (D14)", () => {
     expect(h.registry.snapshots.map((s) => s.handle.id)).toEqual([r.handle!.id]);
     expect(h.registry.projects.get("snap-proj-1")).toMatchObject({
       sourceOrbId: "amp-T-test",
-      handle: { id: r.handle!.id },
+      handle: { id: r.handle!.id, imageRef: "registry.cloudflare.com/acct/cf-orbs-orb@sha256:deadbeef" },
+      imageRef: "registry.cloudflare.com/acct/cf-orbs-orb@sha256:deadbeef",
     });
     expect(h.fake.running).toBe(false);
     expect(h.registry.slots.size).toBe(0);

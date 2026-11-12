@@ -196,7 +196,7 @@ describe("status and logs rendering", () => {
               orbId: "amp-T-1",
               state: "paused",
               imageKey: "orb",
-              handle: { createdAt: "2026-10-30T18:00:00Z", size: 31e6 },
+              handle: { id: "snap-1", createdAt: "2026-10-30T18:00:00Z", size: 31e6 },
             },
             containerRunning: false,
           },
@@ -211,7 +211,7 @@ describe("status and logs rendering", () => {
       "snapshots: 3 retained, 2.50 GB, 1 project snapshot(s), next expiry 2026-11-29T18:00:00Z",
     );
     expect(text).toContain("awake orbs: 1 of 20\n  amp-T-2");
-    expect(text).toMatch(/amp-T-1\s+paused\s+no\s+orb\s+2h\s+31 MB/);
+    expect(text).toMatch(/amp-T-1\s+paused\s+no\s+orb\s+unknown\s+2h\s+31 MB/);
   });
 
   it("renders the provider image digest, and a pending restart when the deploy has another build", () => {
@@ -301,6 +301,57 @@ describe("status and logs rendering", () => {
     expect(text).toMatch(/recent spawns\s+14.1 s per-orb-snapshot, FAILED image, 45.1 s image/);
     expect(text).toMatch(/DO colo\s+YYZ/);
     expect(text).not.toContain("warm until");
+  });
+  it("renders the disk image and marks an old one", () => {
+    const handle = {
+      id: "snap-1",
+      imageKey: "orb",
+      imageRef: "registry.example/orb@sha256:111111111111",
+      createdAt: "2026-10-30T19:30:00Z",
+      size: 123,
+    };
+    const base = {
+      orb: { orbId: "amp-T-1", state: "paused", imageKey: "orb", handle },
+      containerRunning: false,
+    };
+    expect(
+      renderOrb(
+        {
+          ...base,
+          diskImageRef: "registry.example/orb@sha256:111111111111",
+          currentImageRef: "registry.example/orb@sha256:222222222222",
+          diskImageStale: true,
+        },
+        now,
+      ),
+    ).toMatch(/disk image\s+sha256:111111111111 \(old; current sha256:222222222222\)/);
+    expect(
+      renderOrb(
+        {
+          ...base,
+          diskImageRef: "registry.example/orb@sha256:222222222222",
+          currentImageRef: "registry.example/orb@sha256:222222222222",
+        },
+        now,
+      ),
+    ).toMatch(/disk image\s+sha256:222222222222 \(current\)/);
+    expect(renderOrb(base, now)).toMatch(/disk image\s+unknown \(saved before disk-image tracking\)/);
+    expect(renderOrb({ orb: { orbId: "amp-T-1", state: "awake" } }, now)).toMatch(/disk image\s+-/);
+  });
+  it("marks a stale disk in the per-orb table", () => {
+    const status = {
+      orb: {
+        orbId: "amp-T-2",
+        state: "paused",
+        imageKey: "orb",
+        handle: { id: "snap-2", createdAt: "2026-10-30T19:30:00Z" },
+      },
+      containerRunning: false,
+      diskImageRef: "registry.example/orb@sha256:111111111111",
+      currentImageRef: "registry.example/orb@sha256:222222222222",
+      diskImageStale: true,
+    };
+    expect(renderStatus({ orbs: [status] }, now)).toMatch(/amp-T-2\s+paused\s+no\s+orb\s+STALE/);
   });
   it("renders a warm orb with the time left", () => {
     const warmUntil = new Date(now + 8 * 60_000).toISOString();

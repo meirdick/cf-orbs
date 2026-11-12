@@ -158,6 +158,7 @@ Other things to know:
 
 - A paused orb can wake when somebody views its thread, with no new message. It pauses again later.
 - A snapshot is kept for 30 days after its last restore. An orb paused longer than that starts fresh, and Amp sets up the repo again.
+- After `cf-orbs upgrade` or a `deploy` with a new image digest, a paused orb restores but keeps the old disk content. `cf-orbs status <orb>` shows the disk image as old, with the current ref, until the orb is recreated; new orbs get the new image.
 - Each pause makes a new snapshot, and storage is billed. `cf-orbs snapshots prune` lists the old ones that no orb uses; `--yes` deletes them through `wrangler containers images delete` (works, but Cloudflare does not document it). `cf-orbs status` shows `prunable: N (X GB)`.
 - Work done after the last pause can be lost if Cloudflare stops a container without warning. To limit that, set `checkpointMinutes` (15 or more) to snapshot awake orbs that have changes.
 - The restore is lazy. The first read of a large build cache after a wake is slower than later reads (about 230 MB/s).
@@ -186,7 +187,7 @@ Example: 120 awake hours a month at 20% CPU costs about $27.50 a month in total 
 | Command | Does |
 | --- | --- |
 | `cf-orbs init [dir]` | Scaffold, deploy and check a provider. Flags: `--provider cloudflare\|external`, `--token-file`, `--account-id`, `--provider-name`, `--subdomain`, `--vcpu <1\|2\|3\|4>`, `--name <worker>`, `--no-deploy` (preview: [Workers Builds](docs/install-workers-builds.md), no Docker), `--adopt` (take over an existing Worker of the same name; see Back up) |
-| `cf-orbs status [orb]` | Install status (provider, awake orbs, snapshots), or one orb |
+| `cf-orbs status [orb]` | Install status (provider, awake orbs, snapshots), or one orb. One orb shows its `disk image` and whether it is older than the image now deployed |
 | `cf-orbs logs <orb>` | Redacted bootstrap log of one orb. `--lines N` (default 200) |
 | `cf-orbs logs --provider` | Redacted provider log (last 20 lines) |
 | `cf-orbs doctor` | PASS/FAIL per check, each with a one-line fix. Never starts anything |
@@ -194,7 +195,7 @@ Example: 120 awake hours a month at 20% CPU costs about $27.50 a month in total 
 | `cf-orbs snapshots list` | Project snapshot mappings: Amp snapshot id → Cloudflare snapshot |
 | `cf-orbs snapshots forget <id>` / `forget --all-project` | Drop mappings. The next thread on that project runs setup again |
 | `cf-orbs snapshots prune [--older-than 7d] [--all] [--yes]` | List snapshot data that no orb and no project mapping uses, unused for 7 days. `--yes` deletes it. `--all` removes only the age limit |
-| `cf-orbs upgrade --digest sha256:…` | Move the orb image to a new Amp orb image digest. Keeps the old image key |
+| `cf-orbs upgrade --digest sha256:…` | Move the orb image to a new Amp orb image digest. Keeps the old image key; paused orbs keep their old disk content |
 | `cf-orbs uninstall [--yes]` | List (dry run) or delete the Worker, container apps and images |
 
 Every command takes `--json`, `--dir <project>` and `--non-interactive`. Orb ids are `amp-<thread id>`; `cf-orbs status` lists the awake ones.

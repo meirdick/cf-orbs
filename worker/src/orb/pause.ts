@@ -183,10 +183,12 @@ export async function runPause(
   }
 
   const createdAt = now();
+  const imageRef = container.images()[rec.imageKey];
   const handle: Handle = {
     id: snap.id,
     size: snap.size,
     imageKey: rec.imageKey,
+    ...(imageRef ? { imageRef } : {}),
     instance: rec.instance,
     createdAt,
     name: `pause-${orbId}`,
@@ -202,7 +204,6 @@ export async function runPause(
   if (req.snapshotId) {
     try {
       // imageRef holds the deployed digest: spawn compares it with the current image (projectSnapshotRefresh).
-      const imageRef = container.images()[rec.imageKey];
       await registry.putProjectSnapshot({
         snapshotId: req.snapshotId,
         handle,

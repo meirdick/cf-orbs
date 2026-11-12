@@ -256,6 +256,8 @@ describe("Amp snapshot cache hints", () => {
     expect(await upgradeCommand(ctx)).toBe(0);
     expect(await readFile(join(dir, "image", "Dockerfile"), "utf8")).toContain("1".repeat(64));
     const out = cap.lines.join("\n");
+    expect(out).toContain("paused orbs restore on the new image but keep the old disk content");
+    expect(out).not.toContain("may not restore");
     expect(out).toContain("Amp → Orb Settings → Snapshots");
     expect(out).toContain("cf-orbs snapshots forget --all-project");
     expect(cap.lines.slice(-AMP_CACHE_STEPS.length)).toEqual([...AMP_CACHE_STEPS]);

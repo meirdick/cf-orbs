@@ -68,9 +68,8 @@ paused orbs, so:
 - To move to a newer Amp orb image, run `cf-orbs upgrade --digest sha256:<new>`. It bumps the digest
   and keeps the old image buildable under a new key `orb-<short>` (`image/orb-<short>.Dockerfile` and
   an `images` entry). Paused orbs and project snapshots still name key `orb`, which is now the new image.
-  They restore on it, as tested above. `upgrade` still warns that they may not, and asks you to push or
-  commit their work first. `upgrade` prints the cache steps from
-  "Add toolchains" step 4; do them.
+  They restore on it, as tested above, but keep the old disk content. `upgrade` warns about that and
+  prints the cache steps from "Add toolchains" step 4; do them.
 - Orbs that are awake during a deploy keep the old Worker code until they pause (a Cloudflare
   behaviour). They keep running on the image they started from.
 

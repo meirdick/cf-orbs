@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { OpRequest } from "../src/core/types";
+import type { OpRequest, SnapshotHandle } from "../src/core/types";
 import {
   appendProgress,
+  diskImageState,
   finishOp,
   getOp,
   hashInputs,
@@ -123,5 +124,41 @@ describe("redactLine", () => {
 
   it("redactWith removes the exact token first", () => {
     expect(redactWith("plain-token-value", "x plain-token-value y")).toBe("x <redacted> y");
+  });
+});
+
+describe("diskImageState", () => {
+  const images = { orb: "registry.example/orb@sha256:222222222222" };
+  const handle = (imageRef?: string): SnapshotHandle => ({
+    id: "snap-1",
+    size: 1,
+    imageKey: "orb",
+    instance: { vcpu: 4, memoryMib: 12288, diskMb: 20000 },
+    createdAt: T,
+    ...(imageRef ? { imageRef } : {}),
+  });
+
+  it("is current when the disk image ref matches the deployed one", () => {
+    expect(diskImageState(handle(images.orb), images)).toEqual({
+      imageRef: images.orb,
+      currentImageRef: images.orb,
+      stale: false,
+    });
+  });
+
+  it("is stale when the key now deploys another image", () => {
+    expect(diskImageState(handle("registry.example/orb@sha256:111111111111"), images)).toMatchObject({
+      imageRef: "registry.example/orb@sha256:111111111111",
+      currentImageRef: images.orb,
+      stale: true,
+    });
+  });
+
+  it("does not guess when the handle has no image ref or the key is gone", () => {
+    expect(diskImageState(handle(), images)).toEqual({ currentImageRef: images.orb, stale: false });
+    expect(diskImageState(handle("registry.example/orb@sha256:111111111111"), {})).toEqual({
+      imageRef: "registry.example/orb@sha256:111111111111",
+      stale: false,
+    });
   });
 });

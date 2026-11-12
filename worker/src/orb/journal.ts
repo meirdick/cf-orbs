@@ -168,6 +168,23 @@ export function handleExpiresAt(h: Handle): number {
   return Math.max(created, restored) + SNAPSHOT_TTL_MS;
 }
 
+/**
+ * Image state of an orb disk: the deployed ref for the handle's image key now, and whether the disk came
+ * from an older ref under that key (a deploy or upgrade with a new digest). A handle from older code has no
+ * imageRef, so it cannot be called stale.
+ */
+export function diskImageState(
+  h: SnapshotHandle,
+  images: Record<string, string>,
+): { imageRef?: string; currentImageRef?: string; stale: boolean } {
+  const currentImageRef = images[h.imageKey];
+  return {
+    ...(h.imageRef ? { imageRef: h.imageRef } : {}),
+    ...(currentImageRef ? { currentImageRef } : {}),
+    stale: Boolean(h.imageRef && currentImageRef && h.imageRef !== currentImageRef),
+  };
+}
+
 export function newOrbRecord(orbId: string, config: ProviderConfig, nowIso: string): OrbRecord {
   return { v: 1, orbId, state: "none", imageKey: "orb", instance: config.instance, updatedAt: nowIso };
 }

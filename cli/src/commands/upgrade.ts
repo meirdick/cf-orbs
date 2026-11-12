@@ -102,7 +102,7 @@ export async function upgradeCommand(ctx: Ctx): Promise<number> {
     `upgrade: old image kept as key ${p.oldKey} (image/${p.oldDockerfileName}, images entry in ${CONFIG_FILE})`,
   );
   ui.warn(
-    "paused orbs may not restore after upgrade (their snapshots name image key orb, which is now the new image); push or commit their work first",
+    "paused orbs restore on the new image but keep the old disk content; new image content reaches only orbs started from the image (cf-orbs status <orb> shows the disk image)",
   );
   ui.warn(
     "awake orbs keep the old Worker code until they pause; keep the old key until their snapshots expire (30 days)",

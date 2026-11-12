@@ -29,6 +29,7 @@ export function orbRow(v: unknown, now: number): string[] {
     stateText(orb, now),
     s.containerRunning === undefined ? "-" : s.containerRunning ? "yes" : "no",
     str(orb.imageKey),
+    diskText(v),
     handle.createdAt ? fmtAge(String(handle.createdAt), now) : "-",
     handle.size === undefined ? "-" : fmtBytes(Number(handle.size)),
     lastStop.at ? `${fmtAge(String(lastStop.at), now)} ago ${str(lastStop.reason)}` : "-",
@@ -40,6 +41,31 @@ export function shortImage(ref: unknown): string {
   if (typeof ref !== "string" || ref === "") return "-";
   const d = /@(sha256:[0-9a-f]{1,12})/.exec(ref);
   return d ? (d[1] as string) : ref.slice(ref.lastIndexOf("/") + 1);
+}
+
+/** Table cell for an orb's disk image: STALE, current, unknown, or "-" when there is no disk. */
+export function diskText(v: unknown): string {
+  const s = obj(v);
+  const orb = s.orb ? obj(s.orb) : s;
+  const handle = obj(orb.handle);
+  if (!handle.id) return "-";
+  if (s.diskImageStale === true) return "STALE";
+  if (typeof s.diskImageRef !== "string" || s.diskImageRef === "") return "unknown";
+  return typeof s.currentImageRef === "string" && s.currentImageRef !== "" ? "current" : "key missing";
+}
+
+/** "sha256:… (current)", "sha256:… (old; current sha256:…)" or unknown for one orb. */
+export function diskImageText(v: unknown): string {
+  const s = obj(v);
+  const orb = s.orb ? obj(s.orb) : s;
+  const handle = obj(orb.handle);
+  if (!handle.id) return "-";
+  const ref = (x: unknown) => (typeof x === "string" && x !== "" ? shortImage(x) : undefined);
+  const disk = ref(s.diskImageRef);
+  const current = ref(s.currentImageRef);
+  if (s.diskImageStale === true) return `${disk ?? "unknown"} (old; current ${current ?? "unknown"})`;
+  if (disk) return current ? `${disk} (current)` : `${disk} (image key not deployed)`;
+  return "unknown (saved before disk-image tracking)";
 }
 
 /** Per project snapshot: age, amp version seen at the pause, image digest, stale flag (projectSnapshotRefresh). */
@@ -122,7 +148,7 @@ export function renderStatus(status: unknown, now = Date.now()): string {
     lines.push("");
     lines.push(
       table(
-        ["ORB", "STATE", "RUNNING", "IMAGE", "SNAP AGE", "SNAP SIZE", "LAST STOP"],
+        ["ORB", "STATE", "RUNNING", "IMAGE", "DISK", "SNAP AGE", "SNAP SIZE", "LAST STOP"],
         orbs.map((o) => orbRow(o, now)),
       ),
     );
@@ -175,6 +201,7 @@ export function renderOrb(status: unknown, now = Date.now()): string {
       s.bootstrap ? `${obj(s.bootstrap).alive ? "alive" : "dead"} pid ${str(obj(s.bootstrap).pid)}` : "-",
     ],
     ["image key", str(orb.imageKey)],
+    ["disk image", diskImageText(s)],
     ["instance", str(orb.instance)],
     ["awake since", orb.awakeSince ? `${str(orb.awakeSince)} (${fmtAge(String(orb.awakeSince), now)})` : "-"],
     ["last wake source", str(orb.lastWakeSource)],

@@ -4,6 +4,14 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- `cf-orbs status <orb>` shows `disk image`: the image the orb's disk came from, and whether it is older than the image now deployed under that key. A paused orb that restores after `cf-orbs upgrade` or a `deploy` with a new digest keeps its old disk content; this shows it. A handle saved before this version has no image ref and shows `unknown`.
+
+### Fixed
+
+- `cf-orbs upgrade` warned that paused orbs may not restore after an upgrade. They do restore (R18); the warning now says they keep the old disk content and that new image content reaches only orbs started from the image.
+
 ## [0.2.5] - 2026-11-10
 
 ### Fixed

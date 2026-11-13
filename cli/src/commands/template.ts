@@ -4,6 +4,8 @@
 // wrangler.jsonc (the button deploys to the account that clicks it). The button is the whole
 // install: the setup page prompts for the Amp provider token (the one uncommented entry in
 // .dev.vars.example) and sets it as a Worker secret, so the user never needs the CLI.
+// package.json's postinstall runs scripts/check-container-names.mjs during every build: it
+// warns when the account already holds the container applications this deploy would name.
 // Re-runnable like init: user-owned files (config, image/, README, package.json) keep their edits.
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -44,7 +46,12 @@ export function templatePackageJson(name: string, wrangler: string): string {
   const pkg = {
     name,
     private: true,
-    scripts: { deploy: "wrangler deploy --config .cf-orbs/wrangler.jsonc" },
+    scripts: {
+      deploy: "wrangler deploy --config .cf-orbs/wrangler.jsonc",
+      // Workers Builds runs npm install before every deploy; the check warns when the account
+      // already has the container applications this deploy names (see check-container-names.mjs).
+      postinstall: "node scripts/check-container-names.mjs",
+    },
     cloudflare: {
       bindings: {
         CONTROL_TOKEN: {
@@ -129,6 +136,11 @@ export async function templateCommand(ctx: Ctx): Promise<number> {
     join(paths.dir, ".dev.vars.example"),
   );
   if (vars) ui.step("scaffold: wrote .dev.vars.example (the button setup page reads it)");
+  const check = await copyWhenMissing(
+    join(t, "button", "scripts", "check-container-names.mjs"),
+    join(paths.dir, "scripts", "check-container-names.mjs"),
+  );
+  if (check) ui.step("scaffold: wrote scripts/check-container-names.mjs (build-time name-collision warning)");
   await allowWranglerRedirect(paths);
   ui.step("scaffold: wrote .wrangler/deploy/config.json (redirects a bare wrangler deploy)");
   // The template repo is public; carry the license like the npm package does.

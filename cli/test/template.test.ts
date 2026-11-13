@@ -4,13 +4,14 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseArgs } from "../src/args";
 import { buttonSnippet, templateCommand, templatePackageJson } from "../src/commands/template";
 import { parseJsonc } from "../src/config";
 import { type Ctx, makeCtx } from "../src/context";
 import type { Ui } from "../src/ui";
-import { type Runner, WRANGLER_PIN } from "../src/wrangler";
+import { type Runner, runProcess, WRANGLER_PIN } from "../src/wrangler";
 import { gitRun } from "./git-run";
 
 let dir: string;
@@ -24,6 +25,7 @@ async function fakeTemplates(root: string) {
     ["dispatch/dispatch.sh", "#!/bin/sh\n"],
     ["button/README.md", "# cf-orbs template\n\nDeploy button README.\n"],
     ["button/dev-vars.example", "# AMP_ORB_PROVIDER_TOKEN=\n# CONTROL_TOKEN=\n"],
+    ["button/scripts/check-container-names.mjs", "// name check stub\n"],
   ] as const) {
     await mkdir(join(root, f, ".."), { recursive: true });
     await writeFile(join(root, f), body);
@@ -66,12 +68,15 @@ function setup() {
 }
 
 describe("template package.json and button", () => {
-  it("has the deploy script, the wrangler pin and both secret descriptions", () => {
+  it("has the deploy script, the postinstall name check, the wrangler pin and both secret descriptions", () => {
     const pkg = JSON.parse(templatePackageJson("cf-orbs", WRANGLER_PIN));
     expect(pkg).toEqual({
       name: "cf-orbs",
       private: true,
-      scripts: { deploy: "wrangler deploy --config .cf-orbs/wrangler.jsonc" },
+      scripts: {
+        deploy: "wrangler deploy --config .cf-orbs/wrangler.jsonc",
+        postinstall: "node scripts/check-container-names.mjs",
+      },
       cloudflare: {
         bindings: {
           CONTROL_TOKEN: { description: expect.stringContaining("cf-orbs CLI") },
@@ -161,6 +166,10 @@ describe("cf-orbs template", () => {
     expect(JSON.parse(await readFile(join(dir, ".wrangler", "deploy", "config.json"), "utf8"))).toEqual({
       configPath: "../../.cf-orbs/wrangler.jsonc",
     });
+    // the postinstall name check ships with the repo
+    const pkg = JSON.parse(await readFile(s.ctx.paths.packageJson, "utf8"));
+    expect(pkg.scripts.postinstall).toBe("node scripts/check-container-names.mjs");
+    expect(tracked).toContain("scripts/check-container-names.mjs");
     expect((await gitRun("git", ["-C", dir, "rev-list", "--count", "HEAD"])).stdout.trim()).toBe("1");
     expect((await gitRun("git", ["-C", dir, "branch", "--show-current"])).stdout.trim()).toBe("main");
 
@@ -189,5 +198,49 @@ describe("cf-orbs template", () => {
     await mkdir(s.ctx.paths.stateDir, { recursive: true });
     await writeFile(s.ctx.paths.state, '{"mode":"git"}\n');
     await expect(templateCommand(s.ctx)).rejects.toThrow(/is a cf-orbs install already/);
+  });
+});
+
+describe("check-container-names (the template's postinstall warning)", () => {
+  const scriptFile = join(
+    import.meta.dirname,
+    "..",
+    "..",
+    "docs",
+    "button-template",
+    "scripts",
+    "check-container-names.mjs",
+  );
+
+  it("names both outcomes — update succeeds, second install fails — and the fix", async () => {
+    const { formatWarning } = await import(pathToFileURL(scriptFile).href);
+    const warning = formatWarning("cf-orbs-template", [
+      { app: "cf-orbs-template-orbsession", worker: "cf-orbs-template" },
+      { app: "cf-orbs-template-providerhost", worker: "" },
+    ]);
+    expect(warning).toContain("SUCCEEDS");
+    expect(warning).toContain("FAILS");
+    expect(warning).toContain("Container application settings were not fully applied");
+    expect(warning).toContain('Change "name" in .cf-orbs/wrangler.jsonc');
+    expect(warning).not.toContain('owned by the Worker ""'); // unknown owners are not named
+  });
+
+  it("reads the Worker name out of the generated wrangler config", async () => {
+    const s = setup();
+    await templateCommand(s.ctx);
+    const { parseWorkerName } = await import(pathToFileURL(scriptFile).href);
+    expect(parseWorkerName(await readFile(s.ctx.paths.wrangler, "utf8"))).toBe("cf-orbs-template");
+  });
+
+  it("stays silent and exits 0 without a build token, like a local npm install", async () => {
+    const s = setup();
+    await templateCommand(s.ctx);
+    const r = await runProcess(process.execPath, [scriptFile], {
+      cwd: dir, // npm runs lifecycle scripts in the repo root
+      env: { CLOUDFLARE_API_TOKEN: "", CF_API_TOKEN: "" },
+      timeoutMs: 60_000,
+    });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("");
   });
 });

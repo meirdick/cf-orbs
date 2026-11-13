@@ -43,7 +43,8 @@ export function formatWarning(name, conflicts) {
     "      failed build shows — and no retry can fix it: the name is taken.",
     "",
     'Second install? Change "name" in .cf-orbs/wrangler.jsonc to a name nothing else in this',
-    "account uses (one line in the GitHub web editor, no CLI), commit, and build again.",
+    'account uses (the GitHub web editor, no CLI) and set the same "name" in cf-orbs.config.jsonc,',
+    "so a later `cf-orbs init` regeneration keeps it. Commit, and build again.",
     `Why: ${DOCS}`,
   ].join("\n");
 }

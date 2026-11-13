@@ -23,7 +23,7 @@ async function fakeTemplates(root: string) {
     ["provider/Dockerfile", "FROM node\n"],
     ["dispatch/dispatch.sh", "#!/bin/sh\n"],
     ["button/README.md", "# cf-orbs template\n\nDeploy button README.\n"],
-    ["button/dev-vars.example", "# CONTROL_TOKEN=\n# AMP_ORB_PROVIDER_TOKEN=\n"],
+    ["button/dev-vars.example", "# AMP_ORB_PROVIDER_TOKEN=\n# CONTROL_TOKEN=\n"],
   ] as const) {
     await mkdir(join(root, f, ".."), { recursive: true });
     await writeFile(join(root, f), body);
@@ -74,7 +74,7 @@ describe("template package.json and button", () => {
       scripts: { deploy: "wrangler deploy --config .cf-orbs/wrangler.jsonc" },
       cloudflare: {
         bindings: {
-          CONTROL_TOKEN: { description: expect.stringContaining("openssl rand -hex 32") },
+          CONTROL_TOKEN: { description: expect.stringContaining("cf-orbs CLI") },
           AMP_ORB_PROVIDER_TOKEN: { description: expect.stringContaining("aop_live_") },
         },
       },
@@ -85,6 +85,19 @@ describe("template package.json and button", () => {
     expect(buttonSnippet("https://github.com/x/cf-orbs-template")).toBe(
       "[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/x/cf-orbs-template)",
     );
+  });
+  it("ships a .dev.vars.example that prompts only for the Amp token", async () => {
+    // The button setup page prompts for every uncommented entry as a required secret, so the
+    // one-click install breaks if the Amp token is commented out or CONTROL_TOKEN is not.
+    const vars = await readFile(
+      join(import.meta.dirname, "..", "..", "docs", "button-template", "dev-vars.example"),
+      "utf8",
+    );
+    const active = vars
+      .split("\n")
+      .filter((l) => /^[A-Z]/.test(l))
+      .map((l) => l.split("=")[0]);
+    expect(active).toEqual(["AMP_ORB_PROVIDER_TOKEN"]);
   });
 });
 

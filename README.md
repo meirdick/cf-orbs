@@ -110,11 +110,11 @@ It prints the dashboard settings to use. The full procedure and caveats are in [
 
 ### One-click install (Deploy to Cloudflare button, preview)
 
-No local tools at all: click the button on the [cf-orbs template repo](https://github.com/meirdick/cf-orbs-template) and Cloudflare clones it into your GitHub account, builds both images with Workers Builds and deploys the Worker. After the deploy, one command in your clone sets the two secrets (`npx cf-orbs init --no-deploy --adopt`) and the install is live.
+No local tools at all: click the button on the [cf-orbs template repo](https://github.com/meirdick/cf-orbs-template) and Cloudflare clones it into your GitHub account, asks for your Amp provider token (the only input), builds both images with Workers Builds and deploys. The provider starts on its own and registers with Amp — no CLI, no terminal.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/meirdick/cf-orbs-template)
 
-You still need Workers Paid and an Amp provider token (set after the deploy, not at click time). The full procedure is in [docs/install-button.md](docs/install-button.md). The template repo is generated from this one with `cf-orbs template`.
+You still need Workers Paid and an Amp provider token (Amp → Settings → Orbs → Add Provider, pasted on the setup page). The full procedure is in [docs/install-button.md](docs/install-button.md). The template repo is generated from this one with `cf-orbs template`.
 
 ### What init validates
 

@@ -13,17 +13,29 @@ Community project, not affiliated with Cloudflare or Amp.
 | A Cloudflare account on **Workers Paid** ($5/month; Containers need it) | Dashboard → Workers & Pages → Plans |
 | An Amp provider token (`aop_live_…`) | Amp → Settings → Orbs → Add Provider. Note the provider name you type there |
 
-You do not need Node, Docker or wrangler for the deploy.
+You do not need Node, Docker, wrangler or this repo's CLI. The install is set-it-and-forget-it: no terminal at any point.
 
 ## 1. Click the button
 
-The Cloudflare page clones this repo into your GitHub account, asks for a repo and Worker name, then builds both container images with Workers Builds and deploys the Worker. The first build takes about 10-15 min.
+The Cloudflare page clones this repo into your GitHub account and asks for a repo name, a Worker name and your **Amp provider token** (`aop_live_…` from Amp → Settings → Orbs → Add Provider) — paste it on the setup page. Cloudflare then builds both container images with Workers Builds and deploys the Worker with your token as a secret. The first build takes about 10-15 min.
 
 Keep the default Worker name `cf-orbs`. If you pick another name on the setup page, set the same `"name"` in `cf-orbs.config.jsonc` afterwards, or the next deploy makes a second Worker.
 
-## 2. Connect the cf-orbs CLI
+When the build finishes the provider starts by itself (within 5 min) and registers with Amp. Nothing else to do.
 
-The deploy sets no secrets, so the provider takes no jobs until you run, in a clone of the repo the button made for you:
+## 2. Try it
+
+In Amp, start a thread on your provider (this spends Amp credits):
+
+```
+amp -ox "hello from cf-orbs" --orb-provider <the provider name from Amp Settings>
+```
+
+The first spawn on each Cloudflare host pulls the 1.8 GB orb image (40-50 s).
+
+## Optional: the cf-orbs CLI
+
+You never need the CLI. Add it only if you want `status`, `logs`, `doctor` or `upgrade` from a terminal, in a clone of the repo the button made for you:
 
 ```sh
 git clone <the repo the button made> && cd <it>
@@ -31,26 +43,12 @@ npx wrangler login          # once, to the account you deployed to
 npx cf-orbs init --no-deploy --adopt
 ```
 
-`init --adopt` asks for the Amp provider token (Enter skips it; set it later with `npx cf-orbs init --no-deploy --token-file <file>`), generates the control token, sets both as secrets on the Worker and writes `.cf-orbs/state.json`, so `status`, `logs` and `doctor` work from this clone. It also prints Workers Builds dashboard steps that the button already did — ignore those.
-
-## 3. Check and try it
-
-```sh
-npx cf-orbs status     # provider: running (the 5-min cron starts it after step 2)
-npx cf-orbs doctor     # every line PASS
-```
-
-Then start the first thread (this spends Amp credits):
-
-```sh
-amp -ox "hello from cf-orbs" --orb-provider <name from Amp Settings>
-```
-
-The first spawn on each Cloudflare host pulls the 1.8 GB orb image (40-50 s).
+`init --adopt` generates the control token, sets it as a Worker secret and writes `.cf-orbs/state.json`. It asks for the Amp token again — press Enter to keep the one the deploy set. It prints Workers Builds dashboard steps that the button already did — ignore those.
 
 ## After that
 
-- **Upgrades and config**: edit `image/Dockerfile` or `cf-orbs.config.jsonc` (orb size, caps, prewarm), run `npx cf-orbs init --no-deploy` to regenerate `.cf-orbs/wrangler.jsonc`, commit, push. Workers Builds builds and deploys on each push.
+- **Upgrades and config**: edit `image/Dockerfile` or `cf-orbs.config.jsonc` (orb size, caps, prewarm), run `npx cf-orbs init --no-deploy` to regenerate `.cf-orbs/wrangler.jsonc`, commit, push. Workers Builds builds and deploys on each push. Without the CLI: Workers Builds redeploys this repo whenever it changes (the [cf-orbs docs](https://github.com/meirdick/cf-orbs#readme) describe what the files do).
+- **Token rotation**: Worker → Settings → Variables and Secrets in the Cloudflare dashboard; paste a new `aop_live_…` there.
 - **Costs**: [cf-orbs costs](https://github.com/meirdick/cf-orbs#costs). A paused orb has no compute charge; the provider container is always on.
 - **Docs**: the [button install guide](https://github.com/meirdick/cf-orbs/blob/main/docs/install-button.md), the [Workers Builds caveats](https://github.com/meirdick/cf-orbs/blob/main/docs/install-workers-builds.md#caveats) (this deploy uses the same machinery) and the [cf-orbs docs](https://cf-orbs-site.mdick85.workers.dev/docs/).
 

@@ -19,14 +19,6 @@ import { gitCommitNew, writeLockfile } from "./init.js";
 export const BUTTON_URL = "https://deploy.workers.cloudflare.com";
 export const BUTTON_IMAGE = `${BUTTON_URL}/button`;
 
-/**
- * The template repo's Worker name. The button setup page takes its default Project name from the
- * repo name, so the Worker must be named after the repo (cf-orbs-template), not after the app
- * (cf-orbs): then the defaults line up and a user who changes nothing gets one project, one
- * Worker. A user who renames the project diverges from the config — the template README warns.
- */
-export const TEMPLATE_WORKER_NAME = "cf-orbs-template";
-
 /** The README snippet that renders the button for a repo URL. */
 export function buttonSnippet(repoUrl: string): string {
   return `[![Deploy to Cloudflare](${BUTTON_IMAGE})](${BUTTON_URL}/?url=${repoUrl})`;
@@ -107,7 +99,7 @@ export async function templateCommand(ctx: Ctx): Promise<number> {
   ui.step(`cf-orbs template in ${paths.dir}`);
 
   const t = ctx.templates ?? templatesDir();
-  await materialize(paths, { templates: t, git: true, configOverrides: { name: TEMPLATE_WORKER_NAME } });
+  await materialize(paths, { templates: t, git: true });
   const config: CfOrbsConfig = await loadConfig(paths.config);
   // No account id: the button deploys to whichever account clicks it, and a checked-in id would
   // make every deploy from the template fail (or land on ours).

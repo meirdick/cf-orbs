@@ -108,6 +108,14 @@ npx cf-orbs init --no-deploy --provider-name <name from Amp> --token-file <file>
 
 It prints the dashboard settings to use. The full procedure and caveats are in [docs/install-workers-builds.md](docs/install-workers-builds.md). This is a preview, and it doesn't change the default install above (local Docker) or any default.
 
+### One-click install (Deploy to Cloudflare button, preview)
+
+No local tools at all: click the button on the [cf-orbs template repo](https://github.com/meirdick/cf-orbs-template) and Cloudflare clones it into your GitHub account, builds both images with Workers Builds and deploys the Worker. After the deploy, one command in your clone sets the two secrets (`npx cf-orbs init --no-deploy --adopt`) and the install is live.
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/meirdick/cf-orbs-template)
+
+You still need Workers Paid and an Amp provider token (set after the deploy, not at click time). The full procedure is in [docs/install-button.md](docs/install-button.md). The template repo is generated from this one with `cf-orbs template`.
+
 ### What init validates
 
 Before the deploy, `init` stops with one `Failed: … — fix: …` line when:
@@ -192,6 +200,7 @@ Example: 120 awake hours a month at 20% CPU costs about $27.50 a month in total 
 | `cf-orbs logs --provider` | Redacted provider log (last 20 lines) |
 | `cf-orbs doctor` | PASS/FAIL per check, each with a one-line fix. Never starts anything |
 | `cf-orbs deploy` | Regenerate `.cf-orbs/wrangler.jsonc` from the config and deploy |
+| `cf-orbs template [dir]` | Write a [Deploy to Cloudflare button](docs/install-button.md) repo: the `--no-deploy` scaffold with no account id and no secrets, ready to push and point the button at |
 | `cf-orbs snapshots list` | Project snapshot mappings: Amp snapshot id → Cloudflare snapshot |
 | `cf-orbs snapshots forget <id>` / `forget --all-project` | Drop mappings. The next thread on that project runs setup again |
 | `cf-orbs snapshots prune [--older-than 7d] [--all] [--yes]` | List snapshot data that no orb and no project mapping uses, unused for 7 days. `--yes` deletes it. `--all` removes only the age limit |
@@ -306,6 +315,7 @@ Method, results and costs: [docs/benchmarks.md](docs/benchmarks.md). The substra
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Install guide for an AI agent at a terminal |
 | [Install without Docker](docs/install-workers-builds.md) | Preview: Workers Builds builds and deploys from a git repo |
+| [One-click install](docs/install-button.md) | Preview: the Deploy to Cloudflare button, and `cf-orbs template` |
 | [Provider host](provider/README.md) | Cloudflare-hosted vs external provider, token rotation |
 | [Orb image](image/README.md) | The pinned image, toolchains, how snapshots relate to it |
 | [Dispatch](dispatch/README.md) | The program Amp runs per job, and its protocol |

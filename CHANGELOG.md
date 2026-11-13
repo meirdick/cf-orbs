@@ -4,6 +4,10 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- `cf-orbs template [dir]`: write a repo that a [Deploy to Cloudflare button](https://developers.cloudflare.com/workers/platform/deploy-buttons/) installs in one click — the `init --no-deploy` scaffold with no account id and no secrets, a button README and `.dev.vars.example`, git-inited with a first commit. No Cloudflare login, Docker or tokens needed to generate it. Push it to a public repo and point the button at it; users then run `init --no-deploy --adopt` in the clone to set the secrets and take over the install. Docs: [docs/install-button.md](docs/install-button.md).
+
 ## [0.2.6] - 2026-11-12
 
 ### Added

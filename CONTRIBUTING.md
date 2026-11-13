@@ -29,7 +29,7 @@ npm ci
 | `provider/` | The provider container: Dockerfile and `entry.sh` |
 | `image/` | The orb image: the pinned Amp image plus `tini` |
 | `bench/` | The substrate bench. Raw results go in `bench/results/` |
-| `docs/` | Architecture, benchmarks and the Amp provider contract |
+| `docs/` | Architecture, benchmarks, the Amp provider contract, install guides. `docs/button-template/` is the README and `.dev.vars.example` that `cf-orbs template` writes into the button repo (synced into `cli/templates/button/` at build time) |
 
 ## Checks
 

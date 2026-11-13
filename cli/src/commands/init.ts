@@ -816,7 +816,7 @@ export function gitNext(o: { worker: string; repoExisted: boolean; ampTokenGiven
 }
 
 /** package-lock.json for npm clean-install in Workers Builds. A failure is one warning. */
-async function writeLockfile(ctx: Ctx): Promise<void> {
+export async function writeLockfile(ctx: Ctx): Promise<void> {
   const { paths, ui } = ctx;
   if (existsSync(join(paths.dir, "package-lock.json"))) return;
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -837,9 +837,15 @@ async function writeLockfile(ctx: Ctx): Promise<void> {
 
 /**
  * git init + first commit when dir is in no git work tree. Returns true when a repo was there already.
- * Checks the staged files for tokens before the commit.
+ * Checks the staged files for tokens before the commit. template passes its own commit message and
+ * rerun hint; the secrets list is the control token plus the Amp token when one was given.
  */
-async function gitCommitNew(ctx: Ctx, ampToken?: string): Promise<boolean> {
+export async function gitCommitNew(
+  ctx: Ctx,
+  ampToken?: string,
+  msg = "cf-orbs init (Workers Builds)",
+  rerun = "cf-orbs init --no-deploy",
+): Promise<boolean> {
   const { paths, ui } = ctx;
   const g = (args: string[]) => ctx.run("git", ["-C", paths.dir, ...args], { timeoutMs: 60_000 });
   if ((await g(["rev-parse", "--is-inside-work-tree"])).code === 0) {
@@ -864,10 +870,10 @@ async function gitCommitNew(ctx: Ctx, ampToken?: string): Promise<boolean> {
     await g(["reset", "-q"]);
     throw new CliError(
       `a token is in file(s) staged for the first commit: ${hits.join(", ")}`,
-      "remove the token from those files (or add them to .gitignore), then rerun cf-orbs init --no-deploy",
+      `remove the token from those files (or add them to .gitignore), then rerun ${rerun}`,
     );
   }
-  const c = await g(["commit", "-q", "-m", "cf-orbs init (Workers Builds)"]);
+  const c = await g(["commit", "-q", "-m", msg]);
   if (c.code === 0) ui.step(`git: made a repo on branch main with a first commit (${staged.length} files)`);
   else
     ui.warn(

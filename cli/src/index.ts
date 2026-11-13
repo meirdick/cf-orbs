@@ -8,6 +8,7 @@ import { initCommand } from "./commands/init.js";
 import { logsCommand } from "./commands/logs.js";
 import { snapshotsCommand } from "./commands/snapshots.js";
 import { statusCommand } from "./commands/status.js";
+import { templateCommand } from "./commands/template.js";
 import { uninstallCommand } from "./commands/uninstall.js";
 import { upgradeCommand } from "./commands/upgrade.js";
 import { type Ctx, makeCtx } from "./context.js";
@@ -71,6 +72,22 @@ export const COMMANDS: Record<string, Command> = {
     summary: "Regenerate wrangler.jsonc from the config and deploy.",
     flags: {},
     run: deployCommand,
+  },
+  template: {
+    usage: "template [dir]",
+    summary: "Write a Deploy to Cloudflare button repo (no login, Docker or tokens needed).",
+    details: [
+      "Writes the same scaffold as init --no-deploy, but talks to no Cloudflare",
+      "account: wrangler.jsonc has no account id, no secrets are made, no Worker",
+      "is created. Push the directory to a public GitHub or GitLab repo and point a",
+      "Deploy to Cloudflare button at it:",
+      "  https://deploy.workers.cloudflare.com/?url=<repo URL>",
+      "Button users then run `cf-orbs init --no-deploy --adopt` in the clone to",
+      "set the secrets and take over the install. Re-runnable; user files keep edits.",
+    ],
+    flags: {},
+    dirPositional: true,
+    run: templateCommand,
   },
   status: {
     usage: "status [orb]",

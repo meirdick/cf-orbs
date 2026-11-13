@@ -1,0 +1,9 @@
+# Secrets for the cf-orbs Worker. The Deploy to Cloudflare setup page reads this file.
+# Both secrets are set on the Worker after the deploy by: npx cf-orbs init --no-deploy --adopt
+# Uncomment a line and paste a value only to set that secret at deploy time.
+
+# Bearer token for the cf-orbs control API. Generate one: openssl rand -hex 32
+# CONTROL_TOKEN=
+
+# Your Amp provider token (aop_live_…), from Amp Settings → Orbs → Add Provider
+# AMP_ORB_PROVIDER_TOKEN=

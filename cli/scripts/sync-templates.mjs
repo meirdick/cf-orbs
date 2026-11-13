@@ -18,6 +18,7 @@ const SOURCES = [
   ["image", "image", "Dockerfile"],
   ["provider", "provider", "Dockerfile"],
   ["dispatch", "dispatch", "dispatch.sh"],
+  ["docs/button-template", "button", "README.md"],
 ];
 
 const skip = (src) => {

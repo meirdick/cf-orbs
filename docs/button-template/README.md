@@ -21,13 +21,15 @@ The Cloudflare page clones this repo into your GitHub or GitLab account and asks
 
 | Setting | What to pick |
 | --- | --- |
-| **Project name** | **`cf-orbs`** — change it from the default `cf-orbs-template`. The deploy builds the Worker named `cf-orbs` in `.cf-orbs/wrangler.jsonc`; a different project name leaves you with a stray empty project beside the real Worker |
+| **Project name** | Keep the default `cf-orbs-template` — it matches `"name"` in `.cf-orbs/wrangler.jsonc`, so the Worker and its container applications all take that name. Any other name works for a first install; see the naming note below |
 | **AMP_ORB_PROVIDER_TOKEN** | Your Amp provider token (`aop_live_…`) from Amp → Settings → Orbs → Add Provider — the only secret asked for |
 | **Enable Preview builds** | **Off** — a Containers Worker gets no preview URL, so a branch push would only burn build minutes uploading an unreleased Worker version (never edit the non-production branch command to `wrangler deploy`) |
 | **Protect with Cloudflare Access** | Off (default) |
 | **Create private Git repository** | Either; private is tidy. The repo holds no secrets — they live on the Worker |
 
 The setup page may say *"No Wrangler configuration detected"* — that is expected: the config lives at `.cf-orbs/wrangler.jsonc` and a committed `.wrangler/deploy/config.json` redirects the deploy to it. Leave Path `/` and the API token as they are.
+
+**Different project name, or a second install in the same Cloudflare account?** The project name renames the Worker, but wrangler still names the container applications from `"name"` in `.cf-orbs/wrangler.jsonc` — the project name cannot reach that file from the setup page ([workers-sdk#15827](https://github.com/cloudflare/workers-sdk/issues/15827)). A first install works under any project name. A second install in the same account must first edit that `"name"` to the project name it will use — one line in the GitHub web editor, no CLI — or the deploy fails at the last step with *"Container application settings were not fully applied"* (a name collision with the first install's applications) that no retry can fix.
 
 Cloudflare then builds both container images with Workers Builds and deploys the Worker with your token as a secret. The first build takes about 10-15 min. When it finishes the provider starts by itself (within 5 min) and registers with Amp. Nothing else to do.
 

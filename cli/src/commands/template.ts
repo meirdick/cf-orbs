@@ -19,6 +19,18 @@ import { gitCommitNew, writeLockfile } from "./init.js";
 export const BUTTON_URL = "https://deploy.workers.cloudflare.com";
 export const BUTTON_IMAGE = `${BUTTON_URL}/button`;
 
+/**
+ * The template repo's Worker name. The button setup page takes its default Project name from the
+ * repo name, and wrangler names the Durable Object-managed container applications from this
+ * config name — not from the project name the deploy runs under (workers-sdk#15827) — so the
+ * Worker must be named after the repo, not after the app: a user who changes nothing gets one
+ * project, one Worker, matching container applications, and no collision with a CLI cf-orbs
+ * install in the same account. A second install in one account edits `name` to its project name
+ * first (the template README documents this). Coupled to the template repo's name: rename one,
+ * rename the other.
+ */
+export const TEMPLATE_WORKER_NAME = "cf-orbs-template";
+
 /** The README snippet that renders the button for a repo URL. */
 export function buttonSnippet(repoUrl: string): string {
   return `[![Deploy to Cloudflare](${BUTTON_IMAGE})](${BUTTON_URL}/?url=${repoUrl})`;
@@ -99,7 +111,7 @@ export async function templateCommand(ctx: Ctx): Promise<number> {
   ui.step(`cf-orbs template in ${paths.dir}`);
 
   const t = ctx.templates ?? templatesDir();
-  await materialize(paths, { templates: t, git: true });
+  await materialize(paths, { templates: t, git: true, configOverrides: { name: TEMPLATE_WORKER_NAME } });
   const config: CfOrbsConfig = await loadConfig(paths.config);
   // No account id: the button deploys to whichever account clicks it, and a checked-in id would
   // make every deploy from the template fail (or land on ours).

@@ -109,7 +109,7 @@ describe("cf-orbs template", () => {
     // files
     const wr = parseJsonc(await readFile(s.ctx.paths.wrangler, "utf8")) as Record<string, unknown>;
     expect(wr).toMatchObject({
-      name: "cf-orbs",
+      name: "cf-orbs-template", // matches the setup page's default project name
       main: "worker/src/index.ts",
       workers_dev: true,
       preview_urls: false,

@@ -21,7 +21,7 @@ The Cloudflare page clones this repo into your GitHub or GitLab account and asks
 
 | Setting | What to pick |
 | --- | --- |
-| **Project name** | **`cf-orbs`** — change it from the default `cf-orbs-template`. The deploy builds the Worker named `cf-orbs` in `.cf-orbs/wrangler.jsonc`; a different project name leaves you with a stray empty project beside the real Worker |
+| **Project name** | Keep the default `cf-orbs-template` — it matches the Worker the config deploys. Renaming it leaves a stray empty project beside the real Worker |
 | **AMP_ORB_PROVIDER_TOKEN** | Your Amp provider token (`aop_live_…`) from Amp → Settings → Orbs → Add Provider — the only secret asked for |
 | **Enable Preview builds** | **Off** — a Containers Worker gets no preview URL, so a branch push would only burn build minutes uploading an unreleased Worker version (never edit the non-production branch command to `wrangler deploy`) |
 | **Protect with Cloudflare Access** | Off (default) |

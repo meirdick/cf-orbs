@@ -17,11 +17,19 @@ You do not need Node, Docker, wrangler or this repo's CLI. The install is set-it
 
 ## 1. Click the button
 
-The Cloudflare page clones this repo into your GitHub account and asks for a repo name, a Worker name and your **Amp provider token** (`aop_live_…` from Amp → Settings → Orbs → Add Provider) — paste it on the setup page. Cloudflare then builds both container images with Workers Builds and deploys the Worker with your token as a secret. The first build takes about 10-15 min.
+The Cloudflare page clones this repo into your GitHub or GitLab account and asks for:
 
-Keep the default Worker name `cf-orbs`. If you pick another name on the setup page, set the same `"name"` in `cf-orbs.config.jsonc` afterwards, or the next deploy makes a second Worker.
+| Setting | What to pick |
+| --- | --- |
+| **Project name** | **`cf-orbs`** — change it from the default `cf-orbs-template`. The deploy builds the Worker named `cf-orbs` in `.cf-orbs/wrangler.jsonc`; a different project name leaves you with a stray empty project beside the real Worker |
+| **AMP_ORB_PROVIDER_TOKEN** | Your Amp provider token (`aop_live_…`) from Amp → Settings → Orbs → Add Provider — the only secret asked for |
+| **Enable Preview builds** | **Off** — a Containers Worker has no preview URL, and a preview build must never deploy over the live Worker |
+| **Protect with Cloudflare Access** | Off (default) |
+| **Create private Git repository** | Either; private is tidy. The repo holds no secrets — they live on the Worker |
 
-When the build finishes the provider starts by itself (within 5 min) and registers with Amp. Nothing else to do.
+The setup page may say *"No Wrangler configuration detected"* — that is expected: the config lives at `.cf-orbs/wrangler.jsonc` and a committed `.wrangler/deploy/config.json` redirects the deploy to it. Leave Path `/` and the API token as they are.
+
+Cloudflare then builds both container images with Workers Builds and deploys the Worker with your token as a secret. The first build takes about 10-15 min. When it finishes the provider starts by itself (within 5 min) and registers with Amp. Nothing else to do.
 
 ## 2. Try it
 

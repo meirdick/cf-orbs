@@ -129,11 +129,13 @@ describe("cf-orbs template", () => {
       expect.arrayContaining([
         ".cf-orbs/control-token",
         ".cf-orbs/state.json",
-        ".wrangler/",
+        ".wrangler/*",
+        "!.wrangler/deploy/",
         "node_modules/",
       ]),
     );
     expect(gi).not.toContain(".cf-orbs/*");
+    expect(gi).not.toContain(".wrangler/");
 
     // no install artifacts
     expect(existsSync(s.ctx.paths.state)).toBe(false);
@@ -150,10 +152,15 @@ describe("cf-orbs template", () => {
         "package-lock.json",
         "README.md",
         ".dev.vars.example",
+        ".wrangler/deploy/config.json",
       ]),
     );
     expect(tracked).not.toContain(".cf-orbs/state.json");
     expect(tracked).not.toContain(".cf-orbs/control-token");
+    // the redirect makes a bare `npx wrangler deploy` (the button's default) load the real config
+    expect(JSON.parse(await readFile(join(dir, ".wrangler", "deploy", "config.json"), "utf8"))).toEqual({
+      configPath: "../../.cf-orbs/wrangler.jsonc",
+    });
     expect((await gitRun("git", ["-C", dir, "rev-list", "--count", "HEAD"])).stdout.trim()).toBe("1");
     expect((await gitRun("git", ["-C", dir, "branch", "--show-current"])).stdout.trim()).toBe("main");
 

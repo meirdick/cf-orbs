@@ -12,7 +12,7 @@ This path is a preview, like [the Workers Builds path](install-workers-builds.md
 
 ## What the user does
 
-1. **Click the button** on the template repo (or any page that embeds it). Requirements: a Cloudflare account on Workers Paid and an Amp provider token (`aop_live_…` from Amp → Settings → Orbs → Add Provider). On the setup page they pick a repo name and a Worker name and **paste the Amp token** — `.dev.vars.example` leaves only that key uncommented, so it is the one secret the page asks for, with the `package.json` description explaining where it comes from. Keep the default Worker name `cf-orbs`, or set the same `"name"` in `cf-orbs.config.jsonc` afterwards — the button rewrites `.cf-orbs/wrangler.jsonc` in their clone, not `cf-orbs.config.jsonc`, and a mismatch makes the next deploy create a second Worker. The first build takes 10-15 min (measured for the Workers Builds path: 10.6 min, plus 2-4 min in the queue).
+1. **Click the button** on the template repo (or any page that embeds it). Requirements: a Cloudflare account on Workers Paid and an Amp provider token (`aop_live_…` from Amp → Settings → Orbs → Add Provider). On the setup page they pick a repo name and set **Project name to `cf-orbs`** (the default `cf-orbs-template` would leave a stray empty project beside the real Worker, which the deploy names `cf-orbs`), turn **Preview builds off** (a Containers Worker has no preview URL, and a preview build must never deploy over the live Worker), and **paste the Amp token** — `.dev.vars.example` leaves only that key uncommented, so it is the one secret the page asks for, with the `package.json` description explaining where it comes from. The repo the button creates can be private; it holds no secrets. The page may say *"No Wrangler configuration detected"* — that is expected, and the redirect below makes the deploy work anyway. The first build takes 10-15 min (measured for the Workers Builds path: 10.6 min, plus 2-4 min in the queue).
 2. **Nothing.** The deploy sets the pasted token as the Worker secret `AMP_ORB_PROVIDER_TOKEN`; the provider starts by itself within 5 min (the Worker cron) and registers with Amp. The install is set-it-and-forget-it: no terminal, no CLI, no further secrets. If the token is left empty the Worker idles safely (it treats an empty token as unset) until one is pasted in the dashboard (Worker → Settings → Variables and Secrets).
 3. **Try it:** in Amp, `amp -ox "hello from cf-orbs" --orb-provider <name from Amp Settings>` (spends Amp credits).
 
@@ -27,6 +27,10 @@ npx wrangler login && npx cf-orbs init --no-deploy --adopt
 ```
 
 `init --adopt` generates the control token, sets it as a Worker secret and writes `.cf-orbs/state.json` in the clone. It asks for the Amp token too — press Enter to keep the one the deploy set. It prints Workers Builds dashboard steps that the button already did — ignore those.
+
+## Why no wrangler.jsonc at the root
+
+The button's setup page only detects a Wrangler config at the repo root; ours is `.cf-orbs/wrangler.jsonc`, so the page says *"No Wrangler configuration detected"*. Moving it to the root would go stale the moment `cf-orbs init`/`deploy` regenerates the `.cf-orbs` one, so the template instead commits [`.wrangler/deploy/config.json`](https://developers.cloudflare.com/workers/wrangler/configuration/) (`{ "configPath": "../../.cf-orbs/wrangler.jsonc" }`), wrangler's documented redirect: a bare `npx wrangler deploy` — the button's default deploy command — loads the real config through it, with all paths still relative to the config. The `deploy` script in `package.json` passes `--config .cf-orbs/wrangler.jsonc` explicitly, so both deploy commands work.
 
 ## Make or refresh the template
 

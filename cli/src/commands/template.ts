@@ -6,7 +6,7 @@
 // .dev.vars.example) and sets it as a Worker secret, so the user never needs the CLI.
 // Re-runnable like init: user-owned files (config, image/, README, package.json) keep their edits.
 import { existsSync } from "node:fs";
-import { cp, mkdir, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { type CfOrbsConfig, loadConfig } from "../config.js";
 import type { Ctx } from "../context.js";
@@ -62,6 +62,28 @@ async function copyWhenMissing(src: string, dst: string, optional = false): Prom
   return true;
 }
 
+/**
+ * The button setup page cannot see a Wrangler config outside the repo root ("No Wrangler
+ * configuration detected"), and its default deploy command is a bare `npx wrangler deploy`,
+ * which would run automatic project configuration instead of deploying this app. A root
+ * wrangler.jsonc would go stale the moment the CLI regenerates .cf-orbs/wrangler.jsonc, so
+ * the template commits wrangler's redirect file instead: `npx wrangler deploy` at the root
+ * loads .cf-orbs/wrangler.jsonc through it (paths in the config stay relative to the config,
+ * so nothing else changes). Also un-ignores the redirect in .gitignore, idempotently.
+ */
+export async function allowWranglerRedirect(p: { dir: string; gitignore: string }): Promise<void> {
+  const redirect = join(p.dir, ".wrangler", "deploy", "config.json");
+  if (!existsSync(redirect)) {
+    await mkdir(dirname(redirect), { recursive: true });
+    await writeFile(redirect, '{ "configPath": "../../.cf-orbs/wrangler.jsonc" }\n');
+  }
+  let gi = await readFile(p.gitignore, "utf8");
+  if (/(^|\n)\.wrangler\/(\n|$)/.test(gi))
+    gi = gi.replace(/(^|\n)\.wrangler\/(\n|$)/, "$1.wrangler/*\n!.wrangler/deploy/$2");
+  if (!/(^|\n)!\.wrangler\/deploy\/(\n|$)/.test(gi)) gi += "!.wrangler/deploy/\n";
+  await writeFile(p.gitignore, gi);
+}
+
 export async function templateCommand(ctx: Ctx): Promise<number> {
   const { ui, paths } = ctx;
   if (nodeMajor(process.versions.node) < 22)
@@ -95,6 +117,8 @@ export async function templateCommand(ctx: Ctx): Promise<number> {
     join(paths.dir, ".dev.vars.example"),
   );
   if (vars) ui.step("scaffold: wrote .dev.vars.example (the button setup page reads it)");
+  await allowWranglerRedirect(paths);
+  ui.step("scaffold: wrote .wrangler/deploy/config.json (redirects a bare wrangler deploy)");
   // The template repo is public; carry the license like the npm package does.
   const pkgRoot = resolve(t, "..");
   for (const f of ["LICENSE", "NOTICE"])

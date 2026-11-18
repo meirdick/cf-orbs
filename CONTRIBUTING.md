@@ -29,7 +29,7 @@ npm ci
 | `provider/` | The provider container: Dockerfile and `entry.sh` |
 | `image/` | The orb image: the pinned Amp image plus `tini` |
 | `bench/` | The substrate bench. Raw results go in `bench/results/` |
-| `docs/` | Architecture, benchmarks and the Amp provider contract |
+| `docs/` | Architecture, benchmarks, the Amp provider contract and the install guides |
 
 ## Checks
 

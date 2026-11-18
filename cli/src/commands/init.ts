@@ -119,7 +119,7 @@ const CRON_PERIOD_MS = 5 * 60_000;
 
 /** One line at the end of a successful init, before the amp command. */
 export const BACKUP_LINE =
-  "back up: cf-orbs.config.jsonc and image/. Guide: https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/";
+  "back up: cf-orbs.config.jsonc and image/. Guide: https://cf-orbs.system3inference.dev/docs/guides/back-up-and-restore/";
 
 export function helloCommand(providerName: string): string {
   return `amp -ox "hello from cf-orbs" --orb-provider ${providerName}`;

@@ -1,8 +1,8 @@
 # cf-orbs
 
-Run [Amp](https://ampcode.com) orbs, the cloud machines where Amp's coding agent works, on your own Cloudflare account. cf-orbs is a self-hosted Amp orb provider built on Cloudflare Containers, and you install it with one command.
+Run [Amp](https://ampcode.com) orbs, the cloud machines where Amp's coding agent works, on your own Cloudflare account. cf-orbs is a self-hosted Amp orb provider built on Cloudflare Containers, and you install it with one click.
 
-Docs: [cf-orbs-site.mdick85.workers.dev/docs](https://cf-orbs-site.mdick85.workers.dev/docs/)
+Docs: [cf-orbs.system3inference.dev/docs](https://cf-orbs.system3inference.dev/docs/)
 
 Community project. Not affiliated with Cloudflare or Amp (Sourcegraph). "Cloudflare" and "Amp" are trademarks of their owners.
 
@@ -11,13 +11,13 @@ Community project. Not affiliated with Cloudflare or Amp (Sourcegraph). "Cloudfl
 Amp's self-hosted orbs work like this: you provide the compute, and Amp turns it into orbs. cf-orbs makes your Cloudflare account that compute. You keep the same Amp threads and the same orb experience, on machines you own.
 
 - **Your account.** Orbs, snapshots and logs stay in your Cloudflare account. The provider connects out to Amp. Nothing connects in.
-- **No server to run.** You install with one CLI. There is no cluster and no extra API key, and Cloudflare runs the machines.
+- **No server to run.** You install with one click, or with one CLI command. There is no cluster and no extra API key, and Cloudflare runs the machines.
 - **Your image.** Orbs start from your own image and toolchain (`image/Dockerfile`).
 - **Your bill.** You pay Cloudflare. A paused orb has no compute charge.
 - **New threads start ready.** Repo setup runs once, and each new thread then starts from that project snapshot with your dependencies already installed.
 - **Recovers by itself.** A lost orb comes back, and the agent runs the failed tool call again. Paused orbs restore after an image rebuild.
 
-Benchmarked as fast or faster than Amp-hosted orbs on first response and installs ([benchmarks](https://cf-orbs-site.mdick85.workers.dev/benchmarks), [method](https://github.com/meirdick/cf-orbs/blob/main/docs/benchmarks.md#method)).
+Benchmarked as fast or faster than Amp-hosted orbs on first response and installs ([benchmarks](https://cf-orbs.system3inference.dev/benchmarks), [method](https://github.com/meirdick/cf-orbs/blob/main/docs/benchmarks.md#method)).
 
 Good to know: a paused orb keeps its files but not its running processes, because Cloudflare saves only the disk. One orb is at most 4 vCPU, 12 GiB memory and 20 GB disk.
 
@@ -33,7 +33,25 @@ cf-orbs makes each orb a Cloudflare Container: a microVM with its own kernel, ne
 
 When Amp pauses an orb, cf-orbs saves the disk as a snapshot and stops the container, so a paused orb has no compute charge. The next message restores the disk. Amp project snapshots work too, so a new thread on a known repo starts from the disk that Amp already set up.
 
-## Prerequisites
+## Install with one click
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/meirdick/cf-orbs-template)
+
+Click the button, paste your Amp provider token and wait for the build (10-15 min). Cloudflare clones the [cf-orbs template repo](https://github.com/meirdick/cf-orbs-template) into your GitHub or GitLab account, builds both images in your account and deploys. The provider then starts by itself and registers with Amp. Nothing runs on your machine.
+
+You need a Cloudflare account on **Workers Paid** ($5/month; Containers need it) and an Amp provider token (`aop_live_…`, from Amp → Settings → Orbs → Add Provider). The setup page and what comes after are in [docs/install-button.md](https://github.com/meirdick/cf-orbs/blob/main/docs/install-button.md).
+
+When the build is done, start a thread on your provider:
+
+```sh
+amp -ox "hello from cf-orbs" --orb-provider <the provider name from Amp Settings>
+```
+
+## Install with the CLI
+
+The CLI builds the images on your machine with Docker and deploys from there. It also gives you `status`, `logs`, `doctor`, `upgrade` and `uninstall`. You can [add it to a one-click install](https://github.com/meirdick/cf-orbs/blob/main/docs/install-button.md#add-the-cli-later) later.
+
+### Prerequisites
 
 | You need | Check |
 | --- | --- |
@@ -45,7 +63,7 @@ When Amp pauses an orb, cf-orbs saves the disk as a snapshot and stops the conta
 
 You don't need to be a workspace admin for a personal provider. Make it in your personal Amp settings.
 
-## Quick start
+### Quick start
 
 ```sh
 mkdir my-orbs && cd my-orbs
@@ -230,7 +248,7 @@ After `cf-orbs deploy`, an orb that is awake keeps the old Worker code until it 
 
 ### Back up
 
-Running orbs need nothing on your machine, because the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. To restore in a new folder, run `init --adopt`. Without it, `init` stops because the Worker already exists. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
+Running orbs need nothing on your machine, because the Worker, the orbs and the snapshots are in Cloudflare. Back up `cf-orbs.config.jsonc` and `image/` (a private git repo is enough; the `.gitignore` that `init` writes keeps the control token out). Keep the Amp provider token in a password manager if you want to restore without making a new one. The control token can be made again. To restore in a new folder, run `init --adopt`. Without it, `init` stops because the Worker already exists. See [Back up and restore](https://cf-orbs.system3inference.dev/docs/guides/back-up-and-restore/).
 
 ## Troubleshooting
 
@@ -306,6 +324,7 @@ Method, results and costs: [docs/benchmarks.md](https://github.com/meirdick/cf-o
 | --- | --- |
 | [AGENTS.md](https://github.com/meirdick/cf-orbs/blob/main/AGENTS.md) | Install guide for an AI agent at a terminal |
 | [Install without Docker](https://github.com/meirdick/cf-orbs/blob/main/docs/install-workers-builds.md) | Preview: Workers Builds builds and deploys from a git repo |
+| [One-click install](https://github.com/meirdick/cf-orbs/blob/main/docs/install-button.md) | The Deploy to Cloudflare button: the setup page, a second install, adding the CLI |
 | [Provider host](https://github.com/meirdick/cf-orbs/blob/main/provider/README.md) | Cloudflare-hosted vs external provider, token rotation |
 | [Orb image](https://github.com/meirdick/cf-orbs/blob/main/image/README.md) | The pinned image, toolchains, how snapshots relate to it |
 | [Dispatch](https://github.com/meirdick/cf-orbs/blob/main/dispatch/README.md) | The program Amp runs per job, and its protocol |

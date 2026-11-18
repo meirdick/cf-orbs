@@ -93,7 +93,7 @@ The first spawn on a new host starts from the image (about 45 s), then Amp sets 
 
 ## Back up
 
-`init` prints a `back up:` line before the final `amp` line. Tell the user to keep `cf-orbs.config.jsonc` and `image/` in a private git repo. The control token can be made again. See [Back up and restore](https://cf-orbs-site.mdick85.workers.dev/docs/guides/back-up-and-restore/).
+`init` prints a `back up:` line before the final `amp` line. Tell the user to keep `cf-orbs.config.jsonc` and `image/` in a private git repo. The control token can be made again. See [Back up and restore](https://cf-orbs.system3inference.dev/docs/guides/back-up-and-restore/).
 
 ## Do not
 

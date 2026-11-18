@@ -1,6 +1,6 @@
 # Benchmarks
 
-Numbers in the README come from these runs. The full tables, with every run and every failure, are on the [results page](https://cf-orbs-site.mdick85.workers.dev/#compare). The raw run files and the E2E harness are not in this repo. The substrate bench is, and you can run it on your own account.
+Numbers in the README come from these runs. The full tables, with every run and every failure, are on the [results page](https://cf-orbs.system3inference.dev/benchmarks). The raw run files and the E2E harness are not in this repo. The substrate bench is, and you can run it on your own account.
 
 ## Method
 

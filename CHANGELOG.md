@@ -4,6 +4,10 @@ All notable changes to cf-orbs are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- One-click install with a [Deploy to Cloudflare button](https://developers.cloudflare.com/workers/platform/deploy-buttons/). Cloudflare clones the [template repo](https://github.com/meirdick/cf-orbs-template) into your GitHub or GitLab account, asks for the Amp provider token, builds both images with Workers Builds and deploys. The provider then starts by itself, with no CLI and no terminal. Any project name works, and a second install in one account is another click. The CLI stays optional: `init --no-deploy --adopt` adds it to a one-click install. Docs: [docs/install-button.md](docs/install-button.md).
+
 ## [0.2.6] - 2026-11-12
 
 ### Added
